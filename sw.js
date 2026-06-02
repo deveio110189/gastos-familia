@@ -1,5 +1,5 @@
 const CACHE = 'gastos-familia-v1';
-const ASSETS = ['/', '/index.html'];
+const ASSETS = ['/gastos-familia/', '/gastos-familia/index.html'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
