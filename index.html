@@ -266,6 +266,31 @@
     .add-cat-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 11px 14px; border: 2px dashed var(--border-strong); border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 10px; transition: all 0.15s; }
     .add-cat-btn:active { background: var(--green-50); border-color: var(--green-500); color: var(--green-700); }
     .default-badge { font-size: 9px; background: var(--gray-100); color: var(--text-hint); padding: 2px 6px; border-radius: 10px; font-weight: 600; }
+
+    /* ── Header info boxes ── */
+    .header-boxes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .header-box { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: var(--radius-sm); padding: 10px 12px; }
+    .header-box-label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
+    .header-box-value { font-size: 17px; font-weight: 700; color: #fff; font-family: var(--mono); }
+    .header-box-value.over { color: var(--red-200); }
+    .header-box-sub { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; font-family: var(--mono); }
+
+    /* ── Report modal ── */
+    .report-table-wrap { overflow-x: auto; margin-top: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    .report-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .report-table th { background: var(--green-700); color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; white-space: nowrap; }
+    .report-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .report-table tr:last-child td { border-bottom: none; }
+    .report-table tr:nth-child(even) td { background: var(--surface-raised); }
+    .report-summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .report-sum-card { background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; text-align: center; }
+    .report-sum-label { font-size: 10px; color: var(--text-hint); text-transform: uppercase; font-weight: 600; letter-spacing: 0.06em; }
+    .report-sum-value { font-size: 15px; font-weight: 700; font-family: var(--mono); margin-top: 3px; }
+    .report-filter-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .report-filter-row .text-input { flex: 1; }
+    .period-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .period-tab { padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--border-strong); background: var(--surface-raised); font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.15s; font-family: var(--font); }
+    .period-tab.active { background: var(--green-500); border-color: var(--green-500); color: #fff; }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -297,12 +322,22 @@
         <button class="month-nav-btn" onclick="changeMonth(1)">›</button>
       </div>
     </div>
-    <div class="total-amount" id="totalAmount">R$ 0,00</div>
+    <div class="header-boxes">
+      <div class="header-box">
+        <div class="header-box-label">💰 Orçamento do mês</div>
+        <div class="header-box-value" id="headerBudget">R$ 0,00</div>
+        <div class="header-box-sub" id="headerBudgetSub">sem limite definido</div>
+      </div>
+      <div class="header-box">
+        <div class="header-box-label">📊 Total gasto</div>
+        <div class="header-box-value" id="totalAmount">R$ 0,00</div>
+        <div class="header-box-sub" id="headerSpentSub">do mês</div>
+      </div>
+    </div>
     <div id="budgetBarWrap" class="budget-bar-wrap" style="display:none">
       <div class="budget-bar-track"><div class="budget-bar-fill" id="budgetBarFill" style="width:0%"></div></div>
       <div class="budget-info" id="budgetInfo"></div>
     </div>
-    <div class="total-label">total do mês</div>
     <div class="person-tabs">
       <div class="person-tab active" onclick="filterByPerson('Welinton')">
         <div class="person-tab-name">Welinton</div>
@@ -360,10 +395,68 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Exportar</div>
-        <input type="month" class="text-input" id="exportMonth" style="margin-bottom:10px" />
-        <button class="btn-primary" onclick="exportToSheets()">📊 Enviar ao Google Sheets</button>
-        <button class="btn-secondary" onclick="exportCSV()" style="margin-top:8px">⬇️ Baixar CSV</button>
+        <div class="card-title">Relatório de gastos</div>
+
+        <!-- Period tabs -->
+        <div class="period-tabs">
+          <button class="period-tab active" id="ptab-month" onclick="setPeriodTab('month')">Este mês</button>
+          <button class="period-tab" id="ptab-custom" onclick="setPeriodTab('custom')">Período livre</button>
+        </div>
+
+        <!-- Month picker (default) -->
+        <div id="periodMonthWrap">
+          <input type="month" class="text-input" id="exportMonth" style="margin-bottom:10px" />
+        </div>
+
+        <!-- Custom date range -->
+        <div id="periodCustomWrap" style="display:none">
+          <div class="report-filter-row">
+            <div>
+              <label style="font-size:11px;color:var(--text-hint);font-weight:600;display:block;margin-bottom:4px">DE</label>
+              <input type="date" class="text-input" id="exportDateFrom" />
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text-hint);font-weight:600;display:block;margin-bottom:4px">ATÉ</label>
+              <input type="date" class="text-input" id="exportDateTo" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Person filter -->
+        <div style="margin-bottom:10px">
+          <label style="font-size:11px;color:var(--text-hint);font-weight:600;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em">Filtrar por pessoa</label>
+          <div style="display:flex;gap:6px">
+            <button class="period-tab active" id="rperson-Todos" onclick="setReportPerson('Todos')">Todos</button>
+            <button class="period-tab" id="rperson-Welinton" onclick="setReportPerson('Welinton')">Welinton</button>
+            <button class="period-tab" id="rperson-Débora" onclick="setReportPerson('Débora')">Débora</button>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <button class="btn-primary" onclick="showReport()" style="margin-bottom:8px">🔍 Exibir em tela</button>
+        <button class="btn-secondary" onclick="exportCSV()" style="margin-bottom:8px">⬇️ Baixar CSV</button>
+        <button class="btn-secondary" onclick="exportToSheets()" style="margin-bottom:0">📊 Enviar ao Google Sheets</button>
+      </div>
+
+      <!-- Inline report result -->
+      <div id="reportResult" style="display:none">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div class="card-title" style="margin-bottom:0" id="reportTitle">Relatório</div>
+            <button onclick="document.getElementById('reportResult').style.display='none'" style="font-size:12px;color:var(--text-hint);background:none;border:none;cursor:pointer;font-family:var(--font)">✕ Fechar</button>
+          </div>
+          <div class="report-summary">
+            <div class="report-sum-card"><div class="report-sum-label">Total</div><div class="report-sum-value red" id="rSumTotal">R$ 0</div></div>
+            <div class="report-sum-card"><div class="report-sum-label">Welinton</div><div class="report-sum-value amber" id="rSumW">R$ 0</div></div>
+            <div class="report-sum-card"><div class="report-sum-label">Débora</div><div class="report-sum-value green" id="rSumD">R$ 0</div></div>
+          </div>
+          <div class="report-table-wrap">
+            <table class="report-table">
+              <thead><tr><th>Data</th><th>Pessoa</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr></thead>
+              <tbody id="reportTableBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -649,6 +742,13 @@ function init() {
   const em = document.getElementById('exportMonth');
   const now = new Date();
   em.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  // Default custom range: first day of month to today
+  const firstDay = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  const today = now.toISOString().split('T')[0];
+  const dfrom = document.getElementById('exportDateFrom');
+  const dto = document.getElementById('exportDateTo');
+  if (dfrom) dfrom.value = firstDay;
+  if (dto) dto.value = today;
 
   const savedConfig = localStorage.getItem('fin_config');
   if (savedConfig) {
@@ -918,6 +1018,30 @@ function updateHeader() {
   document.getElementById('tabW').textContent = fmtCurrency(wTotal);
   document.getElementById('tabD').textContent = fmtCurrency(dTotal);
 
+  // Header boxes — orçamento total das categorias
+  const totalCatBudget = Object.values(categoryBudgets).reduce((s,v) => s+v, 0);
+  const hBudget = document.getElementById('headerBudget');
+  const hBudgetSub = document.getElementById('headerBudgetSub');
+  const hSpentSub = document.getElementById('headerSpentSub');
+  if (totalCatBudget > 0) {
+    hBudget.textContent = fmtCurrency(totalCatBudget);
+    const remaining = totalCatBudget - total;
+    if (remaining >= 0) {
+      hBudgetSub.textContent = `sobram ${fmtCurrency(remaining)}`;
+      hBudget.className = 'header-box-value';
+    } else {
+      hBudgetSub.textContent = `excedeu ${fmtCurrency(Math.abs(remaining))}`;
+      hBudget.className = 'header-box-value over';
+    }
+    const spentPct = totalCatBudget > 0 ? ((total/totalCatBudget)*100).toFixed(0) : 0;
+    hSpentSub.textContent = `${spentPct}% do orçamento`;
+  } else {
+    hBudget.textContent = 'R$ 0,00';
+    hBudget.className = 'header-box-value';
+    hBudgetSub.textContent = 'sem limite definido';
+    hSpentSub.textContent = 'do mês';
+  }
+
   // Per-category budget alerts
   const catAlerts = [];
   const prefixCA = getViewMonthPrefix();
@@ -1131,24 +1255,26 @@ function clearData() {
 
 // ── Export ──
 function exportCSV() {
-  const [year, month] = document.getElementById('exportMonth').value.split('-');
-  const data = expenses.filter(e => e.date.startsWith(`${year}-${month}`));
-  if (!data.length) { showToast('⚠️ Nenhum dado neste mês'); return; }
+  const data = getReportData();
+  if (!data) return;
+  if (!data.length) { showToast('⚠️ Nenhum dado neste período'); return; }
   const csv = ['Data,Pessoa,Categoria,Descrição,Valor', ...data.map(e => `${e.date},${e.person},${e.categoryLabel},"${e.description}",${e.amount.toFixed(2)}`)].join('\n');
   const a = document.createElement('a');
+  const label = reportPeriodTab === 'month' ? document.getElementById('exportMonth').value.replace('-','_') : `${document.getElementById('exportDateFrom').value}_${document.getElementById('exportDateTo').value}`;
   a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'}));
-  a.download = `gastos_${year}_${month}.csv`;
+  a.download = `gastos_${label}.csv`;
   a.click();
   showToast('📥 CSV baixado!');
 }
 
 async function exportToSheets() {
   if (!config.scriptUrl) { showToast('⚠️ Configure o Apps Script primeiro na aba Config'); return; }
-  const [year, month] = document.getElementById('exportMonth').value.split('-');
-  const data = expenses.filter(e => e.date.startsWith(`${year}-${month}`));
-  if (!data.length) { showToast('⚠️ Nenhum dado neste mês'); return; }
+  const data = getReportData();
+  if (!data) return;
+  if (!data.length) { showToast('⚠️ Nenhum dado neste período'); return; }
   showToast('⏳ Enviando ao Google Sheets...');
   try {
+    const [year, month] = reportPeriodTab === 'month' ? document.getElementById('exportMonth').value.split('-') : [null, null];
     await fetch(config.scriptUrl, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'exportMonth', year, month, expenses: data }) });
     showToast('✅ Enviado ao Google Sheets!');
   } catch(e) { showToast('❌ Falha no envio'); }
@@ -1280,6 +1406,85 @@ function confirmDeleteCat() {
   delete categoryBudgets[deletingCatId];
   saveCategories(); closeDelCatModal(); renderCategoryGrid(); renderCatScreen(); vibrate([50,30,50]);
   showToast('🗑️ Categoria excluída');
+}
+
+// ── Report ──
+let reportPeriodTab = 'month';
+let reportPerson = 'Todos';
+
+function setPeriodTab(tab) {
+  reportPeriodTab = tab;
+  document.querySelectorAll('[id^="ptab-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById(`ptab-${tab}`).classList.add('active');
+  document.getElementById('periodMonthWrap').style.display = tab === 'month' ? 'block' : 'none';
+  document.getElementById('periodCustomWrap').style.display = tab === 'custom' ? 'block' : 'none';
+  document.getElementById('reportResult').style.display = 'none';
+}
+
+function setReportPerson(person) {
+  reportPerson = person;
+  ['Todos','Welinton','Débora'].forEach(p => {
+    const el = document.getElementById(`rperson-${p}`);
+    if (el) el.classList.toggle('active', p === person);
+  });
+  document.getElementById('reportResult').style.display = 'none';
+}
+
+function getReportData() {
+  let filtered = [...expenses];
+  if (reportPeriodTab === 'month') {
+    const [year, month] = document.getElementById('exportMonth').value.split('-');
+    if (!year || !month) { showToast('⚠️ Selecione um mês'); return null; }
+    filtered = filtered.filter(e => e.date.startsWith(`${year}-${month}`));
+  } else {
+    const from = document.getElementById('exportDateFrom').value;
+    const to = document.getElementById('exportDateTo').value;
+    if (!from || !to) { showToast('⚠️ Selecione o período'); return null; }
+    if (from > to) { showToast('⚠️ Data inicial deve ser antes da final'); return null; }
+    filtered = filtered.filter(e => e.date >= from && e.date <= to);
+  }
+  if (reportPerson !== 'Todos') filtered = filtered.filter(e => e.person === reportPerson);
+  return filtered.sort((a,b) => b.date.localeCompare(a.date));
+}
+
+function showReport() {
+  const data = getReportData();
+  if (!data) return;
+  if (!data.length) { showToast('⚠️ Nenhum gasto encontrado neste período'); return; }
+
+  const total = data.reduce((s,e) => s+e.amount, 0);
+  const wTotal = data.filter(e=>e.person==='Welinton').reduce((s,e)=>s+e.amount,0);
+  const dTotal = data.filter(e=>e.person==='Débora').reduce((s,e)=>s+e.amount,0);
+
+  // Title
+  let title = '';
+  if (reportPeriodTab === 'month') {
+    const [year, month] = document.getElementById('exportMonth').value.split('-');
+    const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    title = `${months[parseInt(month)-1]}/${year}`;
+  } else {
+    const from = document.getElementById('exportDateFrom').value;
+    const to = document.getElementById('exportDateTo').value;
+    title = `${from} → ${to}`;
+  }
+  if (reportPerson !== 'Todos') title += ` · ${reportPerson}`;
+  document.getElementById('reportTitle').textContent = `📋 ${title}`;
+
+  document.getElementById('rSumTotal').textContent = fmtCurrency(total);
+  document.getElementById('rSumW').textContent = fmtCurrency(wTotal);
+  document.getElementById('rSumD').textContent = fmtCurrency(dTotal);
+
+  document.getElementById('reportTableBody').innerHTML = data.map(e => `
+    <tr>
+      <td>${new Date(e.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</td>
+      <td><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:10px;background:${e.person==='Welinton'?'#E6F1FB':'#EEEDFE'};color:${e.person==='Welinton'?'#185FA5':'#534AB7'}">${e.person}</span></td>
+      <td>${e.categoryIcon} ${e.categoryLabel}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${e.description}</td>
+      <td style="font-family:var(--mono);font-weight:600;color:var(--red-700)">-${fmtCurrency(e.amount)}</td>
+    </tr>`).join('');
+
+  document.getElementById('reportResult').style.display = 'block';
+  document.getElementById('reportResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── Toast ──
