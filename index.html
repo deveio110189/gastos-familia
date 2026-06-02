@@ -241,14 +241,17 @@
 
 
     /* ── Categories Screen ── */
-    .cat-screen-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
-    .cat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
-    .cat-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .cat-card-icon { font-size: 28px; line-height: 1; }
-    .cat-card-name { font-size: 13px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cat-card-actions { display: flex; gap: 4px; flex-shrink: 0; }
-    .cat-card-btn { width: 26px; height: 26px; border-radius: 7px; border: none; background: var(--gray-100); cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; }
-    .cat-card-btn.del-btn:active { background: var(--red-50); }
+    .cat-screen-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .cat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; box-shadow: var(--shadow); }
+    .cat-card-header { display: flex; align-items: center; gap: 10px; }
+    .cat-card-icon { font-size: 22px; line-height: 1; width: 36px; height: 36px; background: var(--gray-50); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .cat-card-name { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cat-card-meta { font-size: 11px; color: var(--text-hint); margin-top: 1px; }
+    .cat-card-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+    .cat-card-btn { height: 30px; padding: 0 10px; border-radius: 8px; border: none; background: var(--gray-100); cursor: pointer; font-size: 12px; font-weight: 600; font-family: var(--font); color: var(--text-muted); display: flex; align-items: center; gap: 4px; transition: background 0.15s; white-space: nowrap; }
+    .cat-card-btn:active { background: var(--green-50); color: var(--green-700); }
+    .cat-card-btn.del-btn:active { background: var(--red-50); color: var(--red-700); }
+    .cat-card-progress { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
     .cat-budget-track { height: 6px; background: var(--gray-100); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
     .cat-budget-fill { height: 100%; border-radius: 3px; background: var(--green-500); transition: width 0.4s; }
     .cat-budget-fill.warn { background: var(--amber-500); }
@@ -260,7 +263,7 @@
     .icon-option { width: 36px; height: 36px; border-radius: 8px; border: 2px solid var(--border); background: var(--surface-raised); cursor: pointer; font-size: 19px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
     .icon-option.selected { border-color: var(--green-500); background: var(--green-50); }
     .icon-option:active { transform: scale(0.9); }
-    .add-cat-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; border: 2px dashed var(--border-strong); border-radius: var(--radius); background: transparent; color: var(--text-muted); font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 10px; transition: all 0.15s; }
+    .add-cat-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 11px 14px; border: 2px dashed var(--border-strong); border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 10px; transition: all 0.15s; }
     .add-cat-btn:active { background: var(--green-50); border-color: var(--green-500); color: var(--green-700); }
     .default-badge { font-size: 9px; background: var(--gray-100); color: var(--text-hint); padding: 2px 6px; border-radius: 10px; font-weight: 600; }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
@@ -268,7 +271,7 @@
     /* Splash */
     #splash { position: fixed; inset: 0; background: #0F6E56; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease 0.3s; }
     #splash.hide { opacity: 0; pointer-events: none; }
-    #splash img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid rgba(255,255,255,0.3); margin-bottom: 20px; }
+    #splash img { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; object-position: center 20%; border: 4px solid rgba(255,255,255,0.3); margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
     #splash-title { font-family: 'Sora', sans-serif; font-size: 24px; font-weight: 700; color: #ffffff; margin-bottom: 6px; }
     #splash-sub { font-family: 'Sora', sans-serif; font-size: 14px; color: rgba(255,255,255,0.6); }
   </style>
@@ -591,6 +594,12 @@ let editingCatBudgetId = null;
 function loadCategories() {
   const r1 = localStorage.getItem('fin_custom_cats'); if (r1) customCategories = JSON.parse(r1);
   const r2 = localStorage.getItem('fin_cat_budgets'); if (r2) categoryBudgets = JSON.parse(r2);
+  // Apply overrides to default categories
+  const overrides = JSON.parse(localStorage.getItem('fin_cat_overrides')||'{}');
+  Object.entries(overrides).forEach(([id, data]) => {
+    const cat = CATEGORIES.find(c=>c.id===id);
+    if (cat) { cat.label = data.label; cat.icon = data.icon; }
+  });
 }
 function saveCategories() {
   localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
@@ -1156,17 +1165,22 @@ function renderCatScreen() {
     const isDefault = DEFAULT_CAT_IDS.includes(cat.id);
     const pct = bgt > 0 ? Math.min((spent/bgt)*100, 100) : 0;
     const fc = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
+    const spentLabel = spent > 0 ? `-${fmtCurrency(spent)}` : 'R$ 0,00';
+    const budgetLabel = bgt > 0 ? `de ${fmtCurrency(bgt)}` : '';
     return `<div class="cat-card">
       <div class="cat-card-header">
         <div class="cat-card-icon">${cat.icon}</div>
-        <div class="cat-card-name">${cat.label}</div>
+        <div style="flex:1;min-width:0">
+          <div class="cat-card-name">${cat.label}</div>
+          <div class="cat-card-meta">${spentLabel}${budgetLabel ? ` ${budgetLabel}` : ' este mês'}</div>
+        </div>
         <div class="cat-card-actions">
-          <button class="cat-card-btn" onclick="openCatBudgetModal('${cat.id}')" title="Orçamento">💰</button>
-          ${!isDefault ? `<button class="cat-card-btn del-btn" onclick="openDelCatModal('${cat.id}')">🗑️</button>` : `<span class="default-badge">padrão</span>`}
+          <button class="cat-card-btn" onclick="openCatBudgetModal('${cat.id}')">💰 Orçamento</button>
+          <button class="cat-card-btn" onclick="openCatModal('${cat.id}')">✏️</button>
+          ${!isDefault ? `<button class="cat-card-btn del-btn" onclick="openDelCatModal('${cat.id}')">🗑️</button>` : ''}
         </div>
       </div>
-      ${spent > 0 ? `<div class="cat-budget-label">Gasto este mês</div><div class="cat-spent">-${fmtCurrency(spent)}</div>` : '<div style="font-size:12px;color:var(--text-hint)">Sem gastos este mês</div>'}
-      ${bgt > 0 ? `<div style="margin-top:8px"><div class="cat-budget-label">Orçamento: ${fmtCurrency(bgt)}</div><div class="cat-budget-track"><div class="cat-budget-fill ${fc}" style="width:${pct.toFixed(1)}%"></div></div><div class="cat-budget-info">${fmtCurrency(spent)} / ${fmtCurrency(bgt)} (${pct.toFixed(0)}%)</div></div>` : `<div style="margin-top:6px"><button onclick="openCatBudgetModal('${cat.id}')" style="font-size:11px;color:var(--green-700);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:600;padding:0">+ Definir orçamento</button></div>`}
+      ${bgt > 0 ? `<div class="cat-card-progress"><div class="cat-budget-track"><div class="cat-budget-fill ${fc}" style="width:${pct.toFixed(1)}%"></div></div><div class="cat-budget-info" style="margin-top:3px">${fmtCurrency(spent)} / ${fmtCurrency(bgt)} — ${pct.toFixed(0)}%</div></div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1178,7 +1192,7 @@ function openCatModal(editId) {
   document.getElementById('catModalTitle').textContent = editId ? 'Editar categoria' : 'Nova categoria';
   document.getElementById('catSubmitBtn').textContent = editId ? 'Salvar' : 'Criar categoria';
   if (editId) {
-    const cat = customCategories.find(c=>c.id===editId);
+    const cat = getAllCategories().find(c=>c.id===editId);
     if (cat) { document.getElementById('catNameInput').value = cat.label; selectedCatIcon = cat.icon; }
     const b = categoryBudgets[editId]||0;
     document.getElementById('catBudgetInput').value = b > 0 ? b.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
@@ -1210,8 +1224,19 @@ function submitCategory() {
   const raw = document.getElementById('catBudgetInput').value.replace(/\./g,'').replace(',','.');
   const bVal = parseFloat(raw)||0;
   if (editingCatId) {
-    const idx = customCategories.findIndex(c=>c.id===editingCatId);
-    if (idx!==-1) { customCategories[idx].label=name; customCategories[idx].icon=selectedCatIcon; }
+    const isDefCat = DEFAULT_CAT_IDS.includes(editingCatId);
+    if (isDefCat) {
+      // Store override for default category label/icon
+      let overrides = JSON.parse(localStorage.getItem('fin_cat_overrides')||'{}');
+      overrides[editingCatId] = { label: name, icon: selectedCatIcon };
+      localStorage.setItem('fin_cat_overrides', JSON.stringify(overrides));
+      // Update in CATEGORIES array in memory
+      const cat = CATEGORIES.find(c=>c.id===editingCatId);
+      if (cat) { cat.label = name; cat.icon = selectedCatIcon; }
+    } else {
+      const idx = customCategories.findIndex(c=>c.id===editingCatId);
+      if (idx!==-1) { customCategories[idx].label=name; customCategories[idx].icon=selectedCatIcon; }
+    }
     if (bVal>0) categoryBudgets[editingCatId]=bVal; else delete categoryBudgets[editingCatId];
   } else {
     const id = 'custom_'+Date.now().toString(36);
