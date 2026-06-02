@@ -1337,7 +1337,20 @@ window.addEventListener('popstate', function() {
 });
 
 // ── Service Worker ──
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    // Verifica atualização toda vez que o app abre
+    reg.update();
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'activated') {
+          console.log('[SW] Nova versão ativada!');
+        }
+      });
+    });
+  }).catch(() => {});
+}
 
 init();
 </script>
