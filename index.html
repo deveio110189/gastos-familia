@@ -527,6 +527,48 @@
       margin-bottom: 20px;
     }
 
+    /* ── Exit modal ── */
+    .exit-modal-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+      padding: 24px;
+    }
+    .exit-modal-overlay.open { opacity: 1; pointer-events: all; }
+    .exit-modal-box {
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 28px 24px 20px;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+      transform: scale(0.92);
+      transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .exit-modal-overlay.open .exit-modal-box { transform: scale(1); }
+    .exit-modal-icon { font-size: 40px; margin-bottom: 12px; }
+    .exit-modal-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .exit-modal-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5; }
+    .exit-modal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .exit-btn-cancel {
+      padding: 13px; border-radius: var(--radius-sm);
+      border: 2px solid var(--border-strong);
+      background: transparent; color: var(--text);
+      font-family: var(--font); font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .exit-btn-cancel:active { background: var(--gray-100); }
+    .exit-btn-confirm {
+      padding: 13px; border-radius: var(--radius-sm);
+      border: none; background: var(--red-500); color: white;
+      font-family: var(--font); font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .exit-btn-confirm:active { background: var(--red-700); }
+
     /* ── Toast ── */
     .toast {
       position: absolute;
@@ -738,6 +780,19 @@
       <span>Config</span>
     </button>
   </nav>
+
+  <!-- Exit Modal -->
+  <div class="exit-modal-overlay" id="exitModal">
+    <div class="exit-modal-box">
+      <div class="exit-modal-icon">👋</div>
+      <div class="exit-modal-title">Sair do app?</div>
+      <div class="exit-modal-desc">Tem certeza que deseja fechar o Gastos Família?</div>
+      <div class="exit-modal-btns">
+        <button class="exit-btn-cancel" onclick="closeExitModal()">Ficar</button>
+        <button class="exit-btn-confirm" onclick="confirmExit()">Sair</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Add Expense Modal -->
   <div class="modal-overlay" id="addModal" onclick="handleModalClick(event)">
@@ -1163,6 +1218,58 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
 }
+
+// ── Exit Modal ──
+function openExitModal() {
+  document.getElementById('exitModal').classList.add('open');
+}
+function closeExitModal() {
+  document.getElementById('exitModal').classList.remove('open');
+}
+function confirmExit() {
+  closeExitModal();
+  if (navigator.app && navigator.app.exitApp) {
+    navigator.app.exitApp();
+  } else {
+    window.location.href = 'about:blank';
+    setTimeout(() => window.close(), 100);
+  }
+}
+
+// ── Back button handler ──
+let currentScreen = 'home';
+const _origShowScreen = showScreen;
+showScreen = function(name) {
+  if (name !== currentScreen) {
+    history.pushState({ screen: name }, '', '');
+    currentScreen = name;
+  }
+  _origShowScreen(name);
+};
+history.replaceState({ screen: 'home' }, '', '');
+
+window.addEventListener('popstate', function() {
+  const addModal = document.getElementById('addModal');
+  const exitModal = document.getElementById('exitModal');
+  if (addModal.classList.contains('open')) {
+    closeModal();
+    history.pushState({ screen: currentScreen }, '', '');
+    return;
+  }
+  if (exitModal.classList.contains('open')) {
+    closeExitModal();
+    history.pushState({ screen: currentScreen }, '', '');
+    return;
+  }
+  if (currentScreen !== 'home') {
+    currentScreen = 'home';
+    _origShowScreen('home');
+    history.pushState({ screen: 'home' }, '', '');
+    return;
+  }
+  history.pushState({ screen: 'home' }, '', '');
+  openExitModal();
+});
 
 // ── Service Worker ──
 if ('serviceWorker' in navigator) {
