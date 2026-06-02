@@ -239,6 +239,30 @@
     .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+
+    /* ── Categories Screen ── */
+    .cat-screen-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
+    .cat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
+    .cat-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .cat-card-icon { font-size: 28px; line-height: 1; }
+    .cat-card-name { font-size: 13px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cat-card-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .cat-card-btn { width: 26px; height: 26px; border-radius: 7px; border: none; background: var(--gray-100); cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    .cat-card-btn.del-btn:active { background: var(--red-50); }
+    .cat-budget-track { height: 6px; background: var(--gray-100); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+    .cat-budget-fill { height: 100%; border-radius: 3px; background: var(--green-500); transition: width 0.4s; }
+    .cat-budget-fill.warn { background: var(--amber-500); }
+    .cat-budget-fill.over { background: var(--red-500); }
+    .cat-budget-info { font-size: 10px; color: var(--text-hint); font-family: var(--mono); }
+    .cat-budget-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+    .cat-spent { font-size: 13px; font-weight: 600; font-family: var(--mono); color: var(--red-700); }
+    .icon-picker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 8px; }
+    .icon-option { width: 36px; height: 36px; border-radius: 8px; border: 2px solid var(--border); background: var(--surface-raised); cursor: pointer; font-size: 19px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .icon-option.selected { border-color: var(--green-500); background: var(--green-50); }
+    .icon-option:active { transform: scale(0.9); }
+    .add-cat-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; border: 2px dashed var(--border-strong); border-radius: var(--radius); background: transparent; color: var(--text-muted); font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 10px; transition: all 0.15s; }
+    .add-cat-btn:active { background: var(--green-50); border-color: var(--green-500); color: var(--green-700); }
+    .default-badge { font-size: 9px; background: var(--gray-100); color: var(--text-hint); padding: 2px 6px; border-radius: 10px; font-weight: 600; }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -300,6 +324,14 @@
       <div id="budgetAlertWrap"></div>
       <div class="card-title">Lançamentos</div>
       <div id="expenseList"></div>
+    </div>
+
+    <!-- Categories -->
+    <div class="screen" id="screen-cats">
+      <button class="add-cat-btn" onclick="openCatModal()">
+        <span style="font-size:20px">+</span> Nova categoria
+      </button>
+      <div id="catScreenGrid" class="cat-screen-grid"></div>
     </div>
 
     <!-- Stats -->
@@ -397,6 +429,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9 22 9 12 15 12 15 22" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span>Início</span>
     </button>
+    <button class="nav-btn" onclick="showScreen('cats')" id="nav-cats">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Categorias</span>
+    </button>
     <button class="nav-btn" onclick="showScreen('stats')" id="nav-stats">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="12" width="4" height="9" rx="1" stroke-linecap="round" stroke-linejoin="round"/><rect x="10" y="7" width="4" height="14" rx="1" stroke-linecap="round" stroke-linejoin="round"/><rect x="17" y="3" width="4" height="18" rx="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span>Resumo</span>
@@ -406,6 +442,60 @@
       <span>Config</span>
     </button>
   </nav>
+
+  <!-- Add/Edit Category Modal -->
+  <div class="modal-overlay" id="catModal" onclick="handleCatModalClick(event)">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="catModalTitle">Nova categoria</div>
+      <div class="form-group">
+        <label class="form-label">Nome da categoria</label>
+        <input type="text" class="text-input" id="catNameInput" placeholder="Ex: Academia, Farmácia..." maxlength="30" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Escolha um ícone</label>
+        <div class="icon-picker-grid" id="iconPickerGrid"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Orçamento mensal (opcional)</label>
+        <div class="amount-input-wrap">
+          <span class="currency-prefix">R$</span>
+          <input type="text" class="amount-input" id="catBudgetInput" placeholder="0,00" inputmode="numeric" style="font-size:22px;padding:10px 0" />
+        </div>
+        <p style="font-size:12px;color:var(--text-hint);margin-top:6px">Deixe em branco para sem limite</p>
+      </div>
+      <button class="btn-primary" id="catSubmitBtn" onclick="submitCategory()">Criar categoria</button>
+    </div>
+  </div>
+
+  <!-- Edit Category Budget Modal -->
+  <div class="modal-overlay" id="catBudgetModal" onclick="handleCatBudgetModalClick(event)">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="catBudgetModalTitle">Orçamento</div>
+      <div class="form-group">
+        <label class="form-label">Orçamento mensal (R$)</label>
+        <div class="amount-input-wrap">
+          <span class="currency-prefix">R$</span>
+          <input type="text" class="amount-input" id="catBudgetEditInput" placeholder="0,00" inputmode="numeric" style="font-size:22px;padding:10px 0" />
+        </div>
+        <p style="font-size:12px;color:var(--text-hint);margin-top:6px">Deixe em branco para remover o limite</p>
+      </div>
+      <button class="btn-primary" onclick="saveCatBudget()">Salvar orçamento</button>
+    </div>
+  </div>
+
+  <!-- Delete Category Modal -->
+  <div class="del-modal-overlay" id="delCatModal">
+    <div class="del-modal-box">
+      <div class="del-modal-title">🗑️ Excluir categoria?</div>
+      <div class="del-modal-desc" id="delCatModalDesc">Os gastos existentes não serão apagados.</div>
+      <div class="del-modal-btns">
+        <button class="del-btn-cancel" onclick="closeDelCatModal()">Cancelar</button>
+        <button class="del-btn-confirm" onclick="confirmDeleteCat()">Excluir</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Exit Modal -->
   <div class="exit-modal-overlay" id="exitModal">
@@ -489,6 +579,25 @@
 </div>
 
 <script>
+const AVAILABLE_ICONS = ['🍽️','🛒','🚗','💊','🏠','📚','🎉','👕','📱','🐾','🎁','📋','✈️','🏋️','🎮','🎬','🍕','☕','🏥','💇','🧹','💡','🔧','🚿','📦','💳','🎓','🏦','🍺','🎵','🏖️','🌿','💈','🧴','👶','🐕','🐈','🚴','⚽','🎯','🧘','🏊','🍰','🥗','🧃','🍫','🪴','💐','🛋️','🪟','🛏️','🖥️','📷','⌚','💍','👜','🧳','🔑','🪥','🧺'];
+const DEFAULT_CAT_IDS = ['alimentacao','mercado','transporte','saude','moradia','educacao','lazer','vestuario','assinaturas','pets','presentes','outros'];
+let customCategories = [];
+let categoryBudgets = {};
+let selectedCatIcon = '📋';
+let editingCatId = null;
+let deletingCatId = null;
+let editingCatBudgetId = null;
+
+function loadCategories() {
+  const r1 = localStorage.getItem('fin_custom_cats'); if (r1) customCategories = JSON.parse(r1);
+  const r2 = localStorage.getItem('fin_cat_budgets'); if (r2) categoryBudgets = JSON.parse(r2);
+}
+function saveCategories() {
+  localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+  localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
+}
+function getAllCategories() { return [...CATEGORIES, ...customCategories]; }
+
 const CATEGORIES = [
   { id: 'alimentacao', label: 'Alimentação', icon: '🍽️' },
   { id: 'mercado',     label: 'Mercado',     icon: '🛒' },
@@ -519,6 +628,7 @@ let currentMonthOffset = 0; // 0 = current month, -1 = last month, etc.
 // ── Init ──
 function init() {
   setTimeout(() => document.getElementById('splash').classList.add('hide'), 1800);
+  loadCategories();
   loadFromStorage();
   renderCategoryGrid();
   setDefaultDate();
@@ -607,6 +717,7 @@ function showScreen(name) {
   document.getElementById(`screen-${name}`).classList.add('active');
   document.getElementById(`nav-${name}`).classList.add('active');
   if (name === 'stats') renderStats();
+  if (name === 'cats') renderCatScreen();
 }
 
 // ── Person filter ──
@@ -620,7 +731,7 @@ function filterByPerson(p) {
 
 // ── Category grid ──
 function renderCategoryGrid() {
-  document.getElementById('catGrid').innerHTML = CATEGORIES.map(c => `
+  document.getElementById('catGrid').innerHTML = getAllCategories().map(c => `
     <div class="cat-chip" id="chip-${c.id}" onclick="selectCategory('${c.id}')">
       <span class="cat-icon">${c.icon}</span>
       <span class="cat-name">${c.label}</span>
@@ -708,7 +819,7 @@ async function submitExpense() {
   if (!selectedCategory) { showToast('⚠️ Selecione uma categoria'); vibrate(100); return; }
   if (!date) { showToast('⚠️ Selecione uma data'); vibrate(100); return; }
 
-  const cat = CATEGORIES.find(c => c.id === selectedCategory);
+  const cat = getAllCategories().find(c => c.id === selectedCategory);
 
   if (editingId) {
     // Edit existing
@@ -798,6 +909,18 @@ function updateHeader() {
   document.getElementById('tabW').textContent = fmtCurrency(wTotal);
   document.getElementById('tabD').textContent = fmtCurrency(dTotal);
 
+  // Per-category budget alerts
+  const catAlerts = [];
+  const prefixCA = getViewMonthPrefix();
+  const monthExpCA = expenses.filter(e => e.date.startsWith(prefixCA));
+  getAllCategories().forEach(cat => {
+    const cb = categoryBudgets[cat.id]; if (!cb) return;
+    const cs = monthExpCA.filter(e=>e.category===cat.id).reduce((s,e)=>s+e.amount,0);
+    const cp = (cs/cb)*100;
+    if (cp>=100) catAlerts.push(`🚨 <strong>${cat.icon} ${cat.label}</strong>: estourado! (${fmtCurrency(cs)} / ${fmtCurrency(cb)})`);
+    else if (cp>=80) catAlerts.push(`⚠️ <strong>${cat.icon} ${cat.label}</strong>: ${cp.toFixed(0)}% usado`);
+  });
+
   // Budget bar
   const wrap = document.getElementById('budgetBarWrap');
   const alertWrap = document.getElementById('budgetAlertWrap');
@@ -819,7 +942,10 @@ function updateHeader() {
     }
   } else {
     wrap.style.display = 'none';
-    alertWrap.innerHTML = '';
+    alertWrap.innerHTML = catAlerts.map(a=>`<div class="budget-alert warn">${a}</div>`).join('');
+  }
+  if (budget > 0 && catAlerts.length) {
+    alertWrap.innerHTML += catAlerts.map(a=>`<div class="budget-alert warn" style="margin-top:4px">${a}</div>`).join('');
   }
 }
 
@@ -1017,6 +1143,118 @@ async function exportToSheets() {
     await fetch(config.scriptUrl, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'exportMonth', year, month, expenses: data }) });
     showToast('✅ Enviado ao Google Sheets!');
   } catch(e) { showToast('❌ Falha no envio'); }
+}
+
+// ── Categories Screen ──
+function renderCatScreen() {
+  const prefix = getViewMonthPrefix();
+  const monthExp = expenses.filter(e => e.date.startsWith(prefix));
+  const allCats = getAllCategories();
+  document.getElementById('catScreenGrid').innerHTML = allCats.map(cat => {
+    const spent = monthExp.filter(e => e.category === cat.id).reduce((s,e) => s+e.amount, 0);
+    const bgt = categoryBudgets[cat.id] || 0;
+    const isDefault = DEFAULT_CAT_IDS.includes(cat.id);
+    const pct = bgt > 0 ? Math.min((spent/bgt)*100, 100) : 0;
+    const fc = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
+    return `<div class="cat-card">
+      <div class="cat-card-header">
+        <div class="cat-card-icon">${cat.icon}</div>
+        <div class="cat-card-name">${cat.label}</div>
+        <div class="cat-card-actions">
+          <button class="cat-card-btn" onclick="openCatBudgetModal('${cat.id}')" title="Orçamento">💰</button>
+          ${!isDefault ? `<button class="cat-card-btn del-btn" onclick="openDelCatModal('${cat.id}')">🗑️</button>` : `<span class="default-badge">padrão</span>`}
+        </div>
+      </div>
+      ${spent > 0 ? `<div class="cat-budget-label">Gasto este mês</div><div class="cat-spent">-${fmtCurrency(spent)}</div>` : '<div style="font-size:12px;color:var(--text-hint)">Sem gastos este mês</div>'}
+      ${bgt > 0 ? `<div style="margin-top:8px"><div class="cat-budget-label">Orçamento: ${fmtCurrency(bgt)}</div><div class="cat-budget-track"><div class="cat-budget-fill ${fc}" style="width:${pct.toFixed(1)}%"></div></div><div class="cat-budget-info">${fmtCurrency(spent)} / ${fmtCurrency(bgt)} (${pct.toFixed(0)}%)</div></div>` : `<div style="margin-top:6px"><button onclick="openCatBudgetModal('${cat.id}')" style="font-size:11px;color:var(--green-700);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:600;padding:0">+ Definir orçamento</button></div>`}
+    </div>`;
+  }).join('');
+}
+
+function openCatModal(editId) {
+  editId = editId || null;
+  editingCatId = editId;
+  selectedCatIcon = editId ? (getAllCategories().find(c=>c.id===editId)?.icon || '📋') : '📋';
+  document.getElementById('catModalTitle').textContent = editId ? 'Editar categoria' : 'Nova categoria';
+  document.getElementById('catSubmitBtn').textContent = editId ? 'Salvar' : 'Criar categoria';
+  if (editId) {
+    const cat = customCategories.find(c=>c.id===editId);
+    if (cat) { document.getElementById('catNameInput').value = cat.label; selectedCatIcon = cat.icon; }
+    const b = categoryBudgets[editId]||0;
+    document.getElementById('catBudgetInput').value = b > 0 ? b.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
+  } else {
+    document.getElementById('catNameInput').value = '';
+    document.getElementById('catBudgetInput').value = '';
+  }
+  renderIconPicker();
+  document.getElementById('catModal').classList.add('open');
+  setTimeout(() => document.getElementById('catNameInput').focus(), 350);
+}
+function closeCatModal() { document.getElementById('catModal').classList.remove('open'); }
+function handleCatModalClick(e) { if (e.target===e.currentTarget) closeCatModal(); }
+
+function renderIconPicker() {
+  document.getElementById('iconPickerGrid').innerHTML = AVAILABLE_ICONS.map(icon =>
+    `<div class="icon-option ${icon===selectedCatIcon?'selected':''}" onclick="selectCatIcon('${icon}')">${icon}</div>`
+  ).join('');
+}
+function selectCatIcon(icon) {
+  selectedCatIcon = icon;
+  document.querySelectorAll('.icon-option').forEach(el => el.classList.toggle('selected', el.textContent===icon));
+  vibrate(20);
+}
+
+function submitCategory() {
+  const name = document.getElementById('catNameInput').value.trim();
+  if (!name) { showToast('⚠️ Digite um nome'); vibrate(100); return; }
+  const raw = document.getElementById('catBudgetInput').value.replace(/\./g,'').replace(',','.');
+  const bVal = parseFloat(raw)||0;
+  if (editingCatId) {
+    const idx = customCategories.findIndex(c=>c.id===editingCatId);
+    if (idx!==-1) { customCategories[idx].label=name; customCategories[idx].icon=selectedCatIcon; }
+    if (bVal>0) categoryBudgets[editingCatId]=bVal; else delete categoryBudgets[editingCatId];
+  } else {
+    const id = 'custom_'+Date.now().toString(36);
+    customCategories.push({id,label:name,icon:selectedCatIcon});
+    if (bVal>0) categoryBudgets[id]=bVal;
+  }
+  saveCategories(); closeCatModal(); renderCategoryGrid(); renderCatScreen(); updateHeader(); vibrate(40);
+  showToast(`${selectedCatIcon} Categoria ${editingCatId?'atualizada':'criada'}!`);
+}
+
+function openCatBudgetModal(catId) {
+  editingCatBudgetId = catId;
+  const cat = getAllCategories().find(c=>c.id===catId);
+  document.getElementById('catBudgetModalTitle').textContent = `Orçamento — ${cat?.label||''}`;
+  const cur = categoryBudgets[catId]||0;
+  document.getElementById('catBudgetEditInput').value = cur>0 ? cur.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
+  document.getElementById('catBudgetModal').classList.add('open');
+  setTimeout(() => document.getElementById('catBudgetEditInput').focus(), 350);
+}
+function closeCatBudgetModal() { document.getElementById('catBudgetModal').classList.remove('open'); editingCatBudgetId=null; }
+function handleCatBudgetModalClick(e) { if (e.target===e.currentTarget) closeCatBudgetModal(); }
+function saveCatBudget() {
+  if (!editingCatBudgetId) return;
+  const raw = document.getElementById('catBudgetEditInput').value.replace(/\./g,'').replace(',','.');
+  const val = parseFloat(raw)||0;
+  if (val>0) categoryBudgets[editingCatBudgetId]=val; else delete categoryBudgets[editingCatBudgetId];
+  saveCategories(); closeCatBudgetModal(); renderCatScreen(); updateHeader(); vibrate(40);
+  showToast(val>0 ? `✅ Orçamento de ${fmtCurrency(val)} definido!` : '✅ Orçamento removido');
+}
+
+function openDelCatModal(catId) {
+  deletingCatId = catId;
+  const cat = customCategories.find(c=>c.id===catId);
+  document.getElementById('delCatModalDesc').textContent = `Excluir "${cat?.label}"? Os gastos existentes não serão apagados.`;
+  document.getElementById('delCatModal').classList.add('open');
+}
+function closeDelCatModal() { document.getElementById('delCatModal').classList.remove('open'); deletingCatId=null; }
+function confirmDeleteCat() {
+  if (!deletingCatId) return;
+  customCategories = customCategories.filter(c=>c.id!==deletingCatId);
+  delete categoryBudgets[deletingCatId];
+  saveCategories(); closeDelCatModal(); renderCategoryGrid(); renderCatScreen(); vibrate([50,30,50]);
+  showToast('🗑️ Categoria excluída');
 }
 
 // ── Toast ──
