@@ -1653,18 +1653,53 @@ showScreen = function(name) {
   if (name !== currentScreen) { history.pushState({ screen: name }, '', ''); currentScreen = name; }
   _origShowScreen(name);
 };
-history.replaceState({ screen: 'home' }, '', '');
 
-window.addEventListener('popstate', function() {
+// Empilha múltiplas entradas para que o botão voltar nunca saia do app
+function setupHistoryGuard() {
+  // Substitui o estado atual e empilha 5 entradas extras como "amortecedor"
+  history.replaceState({ screen: 'home', guard: true }, '', '');
+  for (let i = 0; i < 5; i++) {
+    history.pushState({ screen: 'home', guard: true }, '', '');
+  }
+}
+setupHistoryGuard();
+
+window.addEventListener('popstate', function(e) {
+  // Sempre reempilha uma entrada para nunca esgotar o histórico
+  history.pushState({ screen: currentScreen, guard: true }, '', '');
+
   const addModal = document.getElementById('addModal');
   const exitModal = document.getElementById('exitModal');
   const delModal = document.getElementById('delModal');
-  if (addModal.classList.contains('open')) { closeModal(); history.pushState({ screen: currentScreen }, '', ''); return; }
-  if (delModal.classList.contains('open')) { closeDelModal(); history.pushState({ screen: currentScreen }, '', ''); return; }
-  if (exitModal.classList.contains('open')) { closeExitModal(); history.pushState({ screen: currentScreen }, '', ''); return; }
-  if (currentScreen !== 'home') { currentScreen = 'home'; configUnlocked = false; _origShowScreen('home'); history.pushState({ screen: 'home' }, '', ''); return; }
-  history.pushState({ screen: 'home' }, '', '');
+  const pwdModal = document.getElementById('pwdModal');
+  const catModal = document.getElementById('catModal');
+  const catBudgetModal = document.getElementById('catBudgetModal');
+  const delCatModal = document.getElementById('delCatModal');
+
+  // Fechar qualquer modal aberto
+  if (pwdModal && pwdModal.classList.contains('open')) { closePwdModal(); return; }
+  if (addModal && addModal.classList.contains('open')) { closeModal(); return; }
+  if (delModal && delModal.classList.contains('open')) { closeDelModal(); return; }
+  if (catModal && catModal.classList.contains('open')) { closeCatModal(); return; }
+  if (catBudgetModal && catBudgetModal.classList.contains('open')) { closeCatBudgetModal(); return; }
+  if (delCatModal && delCatModal.classList.contains('open')) { closeDelCatModal(); return; }
+  if (exitModal && exitModal.classList.contains('open')) { closeExitModal(); return; }
+
+  // Voltar para home se estiver em outra tela
+  if (currentScreen !== 'home') {
+    currentScreen = 'home';
+    configUnlocked = false;
+    _origShowScreen('home');
+    return;
+  }
+
+  // Já está na home — mostrar confirmação de saída
   openExitModal();
+});
+
+// Garante que o guard está sempre ativo quando o app fica visível
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) setupHistoryGuard();
 });
 
 // ── Service Worker ──
