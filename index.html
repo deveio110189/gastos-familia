@@ -908,7 +908,8 @@ function openDelModal(id) {
 function closeDelModal() { document.getElementById('delModal').classList.remove('open'); deletingId = null; }
 function confirmDelete() {
   if (!deletingId) return;
-  expenses = expenses.filter(e => e.id !== deletingId);
+  const idToDelete = deletingId;
+  expenses = expenses.filter(e => e.id !== idToDelete);
   saveToStorage();
   closeDelModal();
   updateHeader();
@@ -916,6 +917,7 @@ function confirmDelete() {
   renderStats();
   vibrate([50, 30, 50]);
   showToast('🗑️ Gasto excluído');
+  syncDelete(idToDelete);
 }
 
 // ── Submit ──
@@ -943,7 +945,7 @@ async function submitExpense() {
     renderStats();
     vibrate(40);
     showToast('✏️ Gasto atualizado!');
-    syncExpense(expenses.find(e => e.id === editingId));
+    syncExpense(expenses.find(e => e.id === editingId), 'updateExpense');
   } else {
     const expense = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, createdAt: new Date().toISOString(), synced: false };
     expenses.unshift(expense);
@@ -1170,14 +1172,37 @@ function saveBudget() {
 }
 
 // ── Sync ──
-async function syncExpense(expense) {
+async function syncExpense(expense, action) {
   if (!config.scriptUrl || !expense) return;
+  action = action || 'addExpense';
+  updateSyncBadge('syncing');
   try {
-    await fetch(config.scriptUrl, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'addExpense', expense }) });
+    await fetch(config.scriptUrl, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, expense })
+    });
     expense.synced = true;
     saveToStorage();
     updateSyncBadge(true);
     renderExpenses();
+  } catch(e) {
+    expense.synced = false;
+    saveToStorage();
+    updateSyncBadge(false);
+  }
+}
+
+async function syncDelete(expenseId) {
+  if (!config.scriptUrl) return;
+  updateSyncBadge('syncing');
+  try {
+    await fetch(config.scriptUrl, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deleteExpense', expenseId })
+    });
+    updateSyncBadge(true);
   } catch(e) { updateSyncBadge(false); }
 }
 
@@ -1185,8 +1210,9 @@ async function syncNow() {
   const unsynced = expenses.filter(e => !e.synced);
   if (!unsynced.length) { showToast('✅ Tudo já sincronizado!'); return; }
   showToast(`⏳ Sincronizando ${unsynced.length} lançamento(s)...`);
-  for (const e of unsynced) await syncExpense(e);
-  showToast('✅ Sincronização concluída!');
+  for (const e of unsynced) await syncExpense(e, 'addExpense');
+  const stillUnsynced = expenses.filter(e => !e.synced).length;
+  showToast(stillUnsynced === 0 ? '✅ Sincronização concluída!' : `⚠️ ${stillUnsynced} lançamento(s) falharam`);
   renderExpenses();
 }
 
@@ -1218,10 +1244,20 @@ async function fetchFromSheets() {
   } catch(e) { showToast('❌ Falha ao buscar dados'); }
 }
 
-function updateSyncBadge(ok) {
+function updateSyncBadge(state) {
   const b = document.getElementById('syncBadge');
-  b.className = `sync-badge ${ok ? 'sync-ok' : 'sync-error'}`;
-  b.innerHTML = `<span class="status-dot ${ok ? 'dot-green' : 'dot-red'}"></span> ${ok ? 'Sincronizado' : 'Sem conexão'}`;
+  if (state === 'syncing') {
+    b.className = 'sync-badge sync-pending';
+    b.innerHTML = '<span class="spinner" style="border-color:rgba(186,117,23,0.4);border-top-color:#BA7517;width:10px;height:10px;margin-right:5px"></span> Sincronizando...';
+  } else if (state === true) {
+    b.className = 'sync-badge sync-ok';
+    b.innerHTML = '<span class="status-dot dot-green"></span> Sincronizado';
+  } else {
+    b.className = 'sync-badge sync-error';
+    b.innerHTML = '<span class="status-dot dot-red"></span> Sem conexão — toque para tentar';
+    b.onclick = () => syncNow();
+    b.style.cursor = 'pointer';
+  }
 }
 
 async function testConnection() {
