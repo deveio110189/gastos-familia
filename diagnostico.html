@@ -3,105 +3,110 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Diagnóstico — Gastos Família</title>
+<title>Diagnóstico v2</title>
 <style>
-  body { font-family: sans-serif; padding: 20px; background: #f4f2eb; color: #1a1a18; }
-  h2 { color: #0F6E56; }
-  input { width: 100%; padding: 10px; border: 2px solid #ccc; border-radius: 8px; font-size: 14px; box-sizing: border-box; margin-bottom: 10px; }
-  button { width: 100%; padding: 14px; background: #0F6E56; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 10px; }
-  .result { background: white; border-radius: 8px; padding: 14px; margin-top: 10px; border: 1px solid #ddd; word-break: break-all; }
-  .ok { border-left: 4px solid #1D9E75; }
-  .err { border-left: 4px solid #E24B4A; }
-  .warn { border-left: 4px solid #EF9F27; }
-  pre { font-size: 11px; overflow-x: auto; white-space: pre-wrap; }
-  .step { font-weight: 700; color: #0F6E56; margin-bottom: 6px; }
+  body { font-family: sans-serif; padding: 16px; background: #f4f2eb; color: #1a1a18; }
+  h2 { color: #0F6E56; margin-bottom: 4px; }
+  input { width: 100%; padding: 10px; border: 2px solid #ccc; border-radius: 8px; font-size: 13px; box-sizing: border-box; margin-bottom: 8px; }
+  button { width: 100%; padding: 13px; background: #0F6E56; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 8px; }
+  .r { background: white; border-radius: 8px; padding: 12px; margin-top: 8px; border-left: 4px solid #ccc; word-break: break-all; }
+  .ok { border-left-color: #1D9E75; }
+  .err { border-left-color: #E24B4A; }
+  .warn { border-left-color: #EF9F27; }
+  .title { font-weight: 700; margin-bottom: 4px; }
+  pre { font-size: 11px; overflow-x: auto; white-space: pre-wrap; margin-top: 6px; background: #f6f5f0; padding: 8px; border-radius: 6px; }
 </style>
 </head>
 <body>
-<h2>🔍 Diagnóstico de Sincronização</h2>
-<p style="font-size:13px;color:#666">Cole a URL do Apps Script e clique em Diagnosticar</p>
-
-<input type="url" id="urlInput" placeholder="https://script.google.com/macros/s/.../exec" />
-<button onclick="runDiag()">🚀 Iniciar Diagnóstico</button>
-
-<div id="output"></div>
+<h2>🔍 Diagnóstico v2</h2>
+<p style="font-size:12px;color:#666;margin-bottom:12px">Testa categorias, orçamentos e gastos fixos</p>
+<input type="url" id="url" placeholder="https://script.google.com/macros/s/.../exec" />
+<button onclick="run()">🚀 Diagnosticar</button>
+<div id="out"></div>
 
 <script>
-function log(msg, type, detail) {
-  const out = document.getElementById('output');
-  const div = document.createElement('div');
-  div.className = 'result ' + (type || '');
-  div.innerHTML = '<div class="step">' + msg + '</div>' + (detail ? '<pre>' + detail + '</pre>' : '');
-  out.appendChild(div);
+const out = document.getElementById('out');
+function log(title, type, detail) {
+  const d = document.createElement('div');
+  d.className = 'r ' + (type||'');
+  d.innerHTML = '<div class="title">' + title + '</div>' + (detail ? '<pre>' + detail + '</pre>' : '');
+  out.appendChild(d);
 }
 
-async function runDiag() {
-  document.getElementById('output').innerHTML = '';
-  const url = document.getElementById('urlInput').value.trim();
-  if (!url || !url.includes('script.google.com')) {
-    log('❌ URL inválida', 'err', 'Cole a URL completa do Apps Script');
-    return;
-  }
+async function run() {
+  out.innerHTML = '';
+  const url = document.getElementById('url').value.trim();
+  if (!url.includes('script.google.com')) { log('❌ URL inválida', 'err'); return; }
 
-  log('✅ URL detectada', 'ok', url);
-
-  // Step 1: GET sem parâmetro
-  log('⏳ Testando GET básico...', 'warn');
+  // ── TEST 1: getExpenses ──
+  log('⏳ Testando getExpenses...', 'warn');
   try {
-    const r1 = await fetch(url + '?t=' + Date.now());
-    const t1 = await r1.text();
-    log('✅ GET básico funcionou — Status: ' + r1.status, 'ok', t1.substring(0, 300));
-  } catch(e) {
-    log('❌ GET básico falhou', 'err', e.toString());
-    return;
-  }
+    const r = await fetch(url + '?action=getExpenses&t=' + Date.now());
+    const j = await r.json();
+    log('✅ getExpenses OK — ' + (j.expenses||[]).length + ' gastos', 'ok',
+      JSON.stringify(j.expenses && j.expenses[0], null, 2));
+  } catch(e) { log('❌ getExpenses falhou: ' + e.message, 'err'); }
 
-  // Step 2: GET getExpenses
-  log('⏳ Testando GET getExpenses...', 'warn');
+  // ── TEST 2: getConfig ──
+  log('⏳ Testando getConfig...', 'warn');
   try {
-    const r2 = await fetch(url + '?action=getExpenses&t=' + Date.now());
-    const t2 = await r2.text();
-    log('✅ GET getExpenses — Status: ' + r2.status, 'ok', t2.substring(0, 500));
-
-    // Parse and check
+    const r = await fetch(url + '?action=getConfig&t=' + Date.now());
+    const text = await r.text();
+    log('✅ getConfig respondeu', 'ok', text.substring(0, 600));
     try {
-      const json = JSON.parse(t2);
-      if (json.expenses) {
-        log('✅ JSON válido — ' + json.expenses.length + ' gastos encontrados', 'ok',
-          'Primeiro gasto: ' + JSON.stringify(json.expenses[0], null, 2).substring(0, 400));
-        // Check date format
-        if (json.expenses[0]) {
-          const d = json.expenses[0].date;
-          const isYMD = /^\d{4}-\d{2}-\d{2}$/.test(String(d));
-          log(isYMD ? '✅ Formato de data OK: ' + d : '⚠️ Formato de data INCORRETO: ' + d,
-            isYMD ? 'ok' : 'err',
-            isYMD ? 'Data já está no formato YYYY-MM-DD' : 'Data deveria ser YYYY-MM-DD mas veio: ' + d);
-        }
-      } else {
-        log('⚠️ JSON retornado mas sem campo expenses', 'warn', JSON.stringify(json));
-      }
-    } catch(pe) {
-      log('❌ Resposta não é JSON válido', 'err', pe + '\n\nResposta bruta:\n' + t2.substring(0, 500));
-    }
-  } catch(e) {
-    log('❌ GET getExpenses falhou', 'err', e.toString());
-  }
+      const j = JSON.parse(text);
+      if (j.configData) log('✅ configData encontrado', 'ok', JSON.stringify(j.configData, null, 2).substring(0,400));
+      else log('⚠️ configData está vazio/null — nenhuma config salva ainda', 'warn', JSON.stringify(j));
+    } catch(e) { log('❌ Resposta não é JSON: ' + e.message, 'err', text.substring(0,200)); }
+  } catch(e) { log('❌ getConfig falhou: ' + e.message, 'err'); }
 
-  // Step 3: POST test
-  log('⏳ Testando POST (no-cors)...', 'warn');
+  // ── TEST 3: getRecurring ──
+  log('⏳ Testando getRecurring...', 'warn');
+  try {
+    const r = await fetch(url + '?action=getRecurring&t=' + Date.now());
+    const text = await r.text();
+    log('✅ getRecurring respondeu', 'ok', text.substring(0, 400));
+    try {
+      const j = JSON.parse(text);
+      if (j.recurringData) log('✅ recurringData encontrado', 'ok', JSON.stringify(j.recurringData, null, 2).substring(0,400));
+      else log('⚠️ recurringData está vazio/null — nenhum fixo salvo ainda', 'warn', JSON.stringify(j));
+    } catch(e) { log('❌ Resposta não é JSON: ' + e.message, 'err', text.substring(0,200)); }
+  } catch(e) { log('❌ getRecurring falhou: ' + e.message, 'err'); }
+
+  // ── TEST 4: saveConfig (POST test) ──
+  log('⏳ Testando saveConfig via POST...', 'warn');
   try {
     await fetch(url, {
-      method: 'POST',
-      mode: 'no-cors',
+      method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'ping', test: true })
+      body: JSON.stringify({
+        action: 'saveConfig',
+        configData: {
+          customCategories: [{ id: 'test_diag', label: 'Teste Diagnóstico', icon: '🧪' }],
+          categoryBudgets: { test_diag: 100 },
+          budget: 0,
+          catOverrides: {},
+          updatedAt: new Date().toISOString()
+        }
+      })
     });
-    log('✅ POST no-cors executado sem erro', 'ok', 'POST funciona corretamente');
-  } catch(e) {
-    log('❌ POST falhou', 'err', e.toString());
-  }
+    log('✅ POST saveConfig executado sem erro', 'ok', 'Agora teste getConfig novamente para ver se salvou');
+  } catch(e) { log('❌ POST saveConfig falhou: ' + e.message, 'err'); }
 
-  log('🏁 Diagnóstico concluído — envie os resultados para o suporte', 'ok');
+  // ── TEST 5: getConfig again to verify save worked ──
+  await new Promise(r => setTimeout(r, 2000));
+  log('⏳ Verificando se saveConfig funcionou...', 'warn');
+  try {
+    const r = await fetch(url + '?action=getConfig&t=' + Date.now());
+    const j = await r.json();
+    const saved = j.configData && j.configData.customCategories &&
+      j.configData.customCategories.find(c => c.id === 'test_diag');
+    if (saved) log('✅ saveConfig + getConfig funcionando perfeitamente!', 'ok', 'Categoria de teste encontrada: ' + JSON.stringify(saved));
+    else log('❌ saveConfig não salvou — POST no-cors está bloqueando o envio', 'err',
+      'Resposta: ' + JSON.stringify(j).substring(0,300) + '\n\nIsso significa que o POST chega ao Apps Script mas não consegue retornar confirmação (limitação do no-cors). Os dados PODEM estar sendo salvos mesmo assim.');
+  } catch(e) { log('❌ Verificação falhou: ' + e.message, 'err'); }
+
+  log('🏁 Diagnóstico concluído — mande um print para o suporte', 'ok');
 }
 </script>
 </body>
