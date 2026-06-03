@@ -1434,101 +1434,98 @@ async function syncDelete(expenseId) {
   } catch(e) { console.log('Delete sync failed:', e); }
 }
 
-// ── Pull data from Sheets via GET (works without CORS issues) ──
+// ── Pull data from Sheets via GET ──
 async function fetchFromSheets(silent) {
   if (!config.scriptUrl) {
     if (!silent) showToast('⚠️ Configure o Apps Script primeiro');
     return;
   }
-  if (!silent) updateSyncBadge('syncing');
+  updateSyncBadge('syncing');
   try {
-    // GET requests work fine with Apps Script (no CORS issue)
     const url = config.scriptUrl + '?action=getExpenses&t=' + Date.now();
-    const res = await fetch(url, { method: 'GET', mode: 'cors' });
+    const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(pe) { throw new Error('Resposta inválida: ' + text.substring(0, 100)); }
 
-    if (data.expenses && Array.isArray(data.expenses)) {
-      const localIds = new Set(expenses.map(e => e.id));
-      const deletedIds = new Set(data.deletedIds || []);
-      let added = 0, updated = 0, removed = 0;
+    if (!data.expenses || !Array.isArray(data.expenses)) {
+      updateSyncBadge(true);
+      return;
+    }
 
-      // ── Helper: normalize date to YYYY-MM-DD ──
-      function normalizeDate(raw) {
-        if (!raw) return new Date().toISOString().split('T')[0];
-        // Already in YYYY-MM-DD format
-        if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw))) return String(raw);
-        // Try parsing any other format (e.g. "Wed Apr 01 2026 00:00:00 GMT-0300")
-        try {
-          const d = new Date(raw);
-          if (!isNaN(d)) {
-            // Use local date parts to avoid timezone shift
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
-          }
-        } catch(e) {}
-        return String(raw).split('T')[0] || new Date().toISOString().split('T')[0];
-      }
+    const localIds = new Set(expenses.map(e => e.id));
+    const deletedIds = new Set(data.deletedIds || []);
+    let added = 0, updated = 0, removed = 0;
 
-      // ── Helper: get category icon from label ──
-      function getIconFromLabel(label) {
-        const cat = getAllCategories().find(c => c.label === label || c.categoryLabel === label);
-        return cat ? cat.icon : '📋';
-      }
+    data.expenses.forEach(function(remote) {
+      if (!remote.id) return;
+      if (deletedIds.has(remote.id)) return;
 
-      // Add or update expenses from Sheets
-      data.expenses.forEach(remote => {
-        if (deletedIds.has(remote.id)) return;
-
-        // Normalize date
-        remote.date = normalizeDate(remote.date);
-
-        // Fix missing icon
-        if (!remote.categoryIcon || remote.categoryIcon === '📋') {
-          remote.categoryIcon = getIconFromLabel(remote.categoryLabel) || '📋';
+      // Normalize date — handle any format
+      var rawDate = String(remote.date || '');
+      if (rawDate && !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+        var parsed = new Date(rawDate);
+        if (!isNaN(parsed.getTime())) {
+          var yy = parsed.getFullYear();
+          var mm = String(parsed.getMonth()+1).padStart(2,'0');
+          var dd = String(parsed.getDate()).padStart(2,'0');
+          remote.date = yy+'-'+mm+'-'+dd;
         }
+      }
 
-        if (!localIds.has(remote.id)) {
-          expenses.push({ ...remote, synced: true });
-          added++;
-        } else {
-          const local = expenses.find(x => x.id === remote.id);
-          if (local && remote.updatedAt && (!local.updatedAt || remote.updatedAt > local.updatedAt)) {
-            const idx = expenses.findIndex(x => x.id === remote.id);
-            expenses[idx] = { ...remote, synced: true };
+      // Fix icon
+      if (!remote.categoryIcon || remote.categoryIcon === '' || remote.categoryIcon === 'undefined') {
+        var catMatch = getAllCategories().find(function(c){ return c.label === remote.categoryLabel; });
+        remote.categoryIcon = catMatch ? catMatch.icon : '📋';
+      }
+
+      remote.synced = true;
+
+      if (!localIds.has(remote.id)) {
+        expenses.push(remote);
+        added++;
+      } else {
+        var local = expenses.find(function(x){ return x.id === remote.id; });
+        if (local) {
+          var remoteTime = remote.updatedAt || remote.createdAt || '';
+          var localTime  = local.updatedAt  || local.createdAt  || '';
+          if (remoteTime > localTime) {
+            var idx = expenses.findIndex(function(x){ return x.id === remote.id; });
+            expenses[idx] = remote;
             updated++;
           }
         }
-      });
-
-      // Remove locally any expense deleted on another device
-      deletedIds.forEach(id => {
-        const idx = expenses.findIndex(e => e.id === id);
-        if (idx !== -1) { expenses.splice(idx, 1); removed++; }
-      });
-
-      if (added > 0 || updated > 0 || removed > 0) {
-        expenses.sort((a,b) => b.date.localeCompare(a.date));
-        saveToStorage();
-        updateHeader();
-        renderExpenses();
-        if (document.getElementById('screen-stats').classList.contains('active')) renderStats();
-        const msg = [];
-        if (added > 0) msg.push(`${added} novo(s)`);
-        if (updated > 0) msg.push(`${updated} atualizado(s)`);
-        if (removed > 0) msg.push(`${removed} removido(s)`);
-        showToast(`🔄 ${msg.join(', ')}`);
-      } else {
-        updateSyncBadge(true);
       }
-      updateSyncBadge(true);
+    });
+
+    deletedIds.forEach(function(id) {
+      var idx = expenses.findIndex(function(e){ return e.id === id; });
+      if (idx !== -1) { expenses.splice(idx, 1); removed++; }
+    });
+
+    expenses.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    saveToStorage();
+    updateHeader();
+    renderExpenses();
+    if (document.getElementById('screen-stats').classList.contains('active')) renderStats();
+    updateSyncBadge(true);
+
+    if (added > 0 || updated > 0 || removed > 0) {
+      var msgs = [];
+      if (added > 0) msgs.push(added + ' novo(s)');
+      if (updated > 0) msgs.push(updated + ' atualizado(s)');
+      if (removed > 0) msgs.push(removed + ' removido(s)');
+      showToast('🔄 ' + msgs.join(', '));
+    } else if (!silent) {
+      showToast('✅ Tudo já atualizado!');
     }
+
   } catch(e) {
-    console.log('Fetch from sheets error:', e);
+    console.log('fetchFromSheets error:', e);
     updateSyncBadge(false);
-    if (!silent) showToast('❌ Erro ao buscar dados: ' + e.message);
+    if (!silent) showToast('❌ Erro: ' + e.message);
   }
 }
 
