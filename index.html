@@ -1403,76 +1403,38 @@ async function syncExpense(expense, action) {
   action = action || 'addExpense';
   updateSyncBadge('syncing');
   try {
-    const res = await fetch(config.scriptUrl, {
+    // Use no-cors for POST (Apps Script limitation)
+    await fetch(config.scriptUrl, {
       method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, expense })
     });
-    const data = await res.json();
     expense.synced = true;
     saveToStorage();
     updateSyncBadge(true);
     renderExpenses();
   } catch(e) {
-    // Fallback no-cors (CORS not yet configured)
-    try {
-      await fetch(config.scriptUrl, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, expense })
-      });
-      expense.synced = true;
-      saveToStorage();
-      updateSyncBadge(true);
-      renderExpenses();
-    } catch(e2) {
-      expense.synced = false;
-      saveToStorage();
-      updateSyncBadge(false);
-    }
+    expense.synced = false;
+    saveToStorage();
+    updateSyncBadge(false);
   }
 }
 
 // ── Delete from Sheets ──
 async function syncDelete(expenseId) {
   if (!config.scriptUrl) return;
-  updateSyncBadge('syncing');
   try {
     await fetch(config.scriptUrl, {
       method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'deleteExpense', expenseId })
     });
-    updateSyncBadge(true);
-  } catch(e) {
-    try {
-      await fetch(config.scriptUrl, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'deleteExpense', expenseId })
-      });
-      updateSyncBadge(true);
-    } catch(e2) { updateSyncBadge(false); }
-  }
+  } catch(e) { console.log('Delete sync failed:', e); }
 }
 
-// ── Push all unsynced to Sheets ──
-async function syncNow(silent) {
-  const unsynced = expenses.filter(e => !e.synced);
-  if (unsynced.length) {
-    if (!silent) showToast(`⏳ Enviando ${unsynced.length} lançamento(s)...`);
-    for (const e of unsynced) await syncExpense(e, 'addExpense');
-  }
-  // Also pull updates from Sheets
-  await fetchFromSheets(silent);
-  if (!silent) {
-    const still = expenses.filter(e => !e.synced).length;
-    if (still === 0) showToast('✅ Sincronização concluída!');
-    else showToast(`⚠️ ${still} lançamento(s) pendentes`);
-  }
-}
-
-// ── Pull data from Sheets ──
+// ── Pull data from Sheets via GET (works without CORS issues) ──
 async function fetchFromSheets(silent) {
   if (!config.scriptUrl) {
     if (!silent) showToast('⚠️ Configure o Apps Script primeiro');
@@ -1480,70 +1442,91 @@ async function fetchFromSheets(silent) {
   }
   if (!silent) updateSyncBadge('syncing');
   try {
+    // GET requests work fine with Apps Script (no CORS issue)
     const url = config.scriptUrl + '?action=getExpenses&t=' + Date.now();
-    const res = await fetch(url);
+    const res = await fetch(url, { method: 'GET', mode: 'cors' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
 
     if (data.expenses && Array.isArray(data.expenses)) {
-      const existingIds = new Set(expenses.map(e => e.id));
+      const localIds = new Set(expenses.map(e => e.id));
       const deletedIds = new Set(data.deletedIds || []);
-      let added = 0, removed = 0;
+      let added = 0, updated = 0, removed = 0;
 
-      // Add new expenses from other device
-      data.expenses.forEach(e => {
-        if (!existingIds.has(e.id)) {
-          expenses.push({ ...e, synced: true });
+      // Add or update expenses from Sheets
+      data.expenses.forEach(remote => {
+        if (deletedIds.has(remote.id)) return; // skip if deleted
+        if (!localIds.has(remote.id)) {
+          // New expense from other device
+          expenses.push({ ...remote, synced: true });
           added++;
         } else {
-          // Update if remote is newer
-          const local = expenses.find(x => x.id === e.id);
-          if (local && e.updatedAt && local.updatedAt && e.updatedAt > local.updatedAt) {
-            Object.assign(local, { ...e, synced: true });
-            added++;
+          // Update local if remote has newer updatedAt
+          const local = expenses.find(x => x.id === remote.id);
+          if (local && remote.updatedAt && (!local.updatedAt || remote.updatedAt > local.updatedAt)) {
+            const idx = expenses.findIndex(x => x.id === remote.id);
+            expenses[idx] = { ...remote, synced: true };
+            updated++;
           }
         }
       });
 
-      // Remove deleted expenses from other device
+      // Remove locally any expense deleted on another device
       deletedIds.forEach(id => {
         const idx = expenses.findIndex(e => e.id === id);
         if (idx !== -1) { expenses.splice(idx, 1); removed++; }
       });
 
-      if (added > 0 || removed > 0) {
+      if (added > 0 || updated > 0 || removed > 0) {
         expenses.sort((a,b) => b.date.localeCompare(a.date));
         saveToStorage();
         updateHeader();
         renderExpenses();
         if (document.getElementById('screen-stats').classList.contains('active')) renderStats();
-        if (!silent) showToast(`✅ ${added} novo(s), ${removed} removido(s)`);
-        else if (added > 0 || removed > 0) showToast(`🔄 ${added + removed} atualização(ões) recebida(s)`);
+        const msg = [];
+        if (added > 0) msg.push(`${added} novo(s)`);
+        if (updated > 0) msg.push(`${updated} atualizado(s)`);
+        if (removed > 0) msg.push(`${removed} removido(s)`);
+        showToast(`🔄 ${msg.join(', ')}`);
       }
       updateSyncBadge(true);
     }
   } catch(e) {
-    if (!silent) updateSyncBadge(false);
+    console.log('Fetch from sheets error:', e);
+    updateSyncBadge(false);
+    if (!silent) showToast('❌ Erro ao buscar dados: ' + e.message);
   }
+}
+
+// ── Push unsynced + pull updates ──
+async function syncNow(silent) {
+  if (!config.scriptUrl) {
+    if (!silent) showToast('⚠️ Configure o Apps Script primeiro');
+    return;
+  }
+  const unsynced = expenses.filter(e => !e.synced);
+  if (unsynced.length) {
+    if (!silent) showToast(`⏳ Enviando ${unsynced.length} lançamento(s)...`);
+    for (const e of unsynced) await syncExpense(e, 'addExpense');
+  }
+  await fetchFromSheets(silent);
 }
 
 // ── Auto polling every 60s ──
 function startSyncPolling() {
   if (syncPollingTimer) clearInterval(syncPollingTimer);
   if (!config.scriptUrl) return;
-  // First fetch immediately
+  // Fetch immediately on start
   fetchFromSheets(true);
-  // Then poll every 60s
+  // Then every 60s
   syncPollingTimer = setInterval(() => {
     if (document.visibilityState !== 'hidden') fetchFromSheets(true);
   }, SYNC_INTERVAL);
 }
 
-// Restart polling when app becomes visible
+// Sync when app comes back from background
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && config.scriptUrl) {
-    fetchFromSheets(true);
-  }
+  if (!document.hidden && config.scriptUrl) fetchFromSheets(true);
 });
 
 function updateSyncBadge(state) {
