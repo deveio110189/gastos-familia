@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Diagnóstico — Gastos Família</title>
+<style>
+  body { font-family: sans-serif; padding: 20px; background: #f4f2eb; color: #1a1a18; }
+  h2 { color: #0F6E56; }
+  input { width: 100%; padding: 10px; border: 2px solid #ccc; border-radius: 8px; font-size: 14px; box-sizing: border-box; margin-bottom: 10px; }
+  button { width: 100%; padding: 14px; background: #0F6E56; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 10px; }
+  .result { background: white; border-radius: 8px; padding: 14px; margin-top: 10px; border: 1px solid #ddd; word-break: break-all; }
+  .ok { border-left: 4px solid #1D9E75; }
+  .err { border-left: 4px solid #E24B4A; }
+  .warn { border-left: 4px solid #EF9F27; }
+  pre { font-size: 11px; overflow-x: auto; white-space: pre-wrap; }
+  .step { font-weight: 700; color: #0F6E56; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<h2>🔍 Diagnóstico de Sincronização</h2>
+<p style="font-size:13px;color:#666">Cole a URL do Apps Script e clique em Diagnosticar</p>
+
+<input type="url" id="urlInput" placeholder="https://script.google.com/macros/s/.../exec" />
+<button onclick="runDiag()">🚀 Iniciar Diagnóstico</button>
+
+<div id="output"></div>
+
+<script>
+function log(msg, type, detail) {
+  const out = document.getElementById('output');
+  const div = document.createElement('div');
+  div.className = 'result ' + (type || '');
+  div.innerHTML = '<div class="step">' + msg + '</div>' + (detail ? '<pre>' + detail + '</pre>' : '');
+  out.appendChild(div);
+}
+
+async function runDiag() {
+  document.getElementById('output').innerHTML = '';
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url || !url.includes('script.google.com')) {
+    log('❌ URL inválida', 'err', 'Cole a URL completa do Apps Script');
+    return;
+  }
+
+  log('✅ URL detectada', 'ok', url);
+
+  // Step 1: GET sem parâmetro
+  log('⏳ Testando GET básico...', 'warn');
+  try {
+    const r1 = await fetch(url + '?t=' + Date.now());
+    const t1 = await r1.text();
+    log('✅ GET básico funcionou — Status: ' + r1.status, 'ok', t1.substring(0, 300));
+  } catch(e) {
+    log('❌ GET básico falhou', 'err', e.toString());
+    return;
+  }
+
+  // Step 2: GET getExpenses
+  log('⏳ Testando GET getExpenses...', 'warn');
+  try {
+    const r2 = await fetch(url + '?action=getExpenses&t=' + Date.now());
+    const t2 = await r2.text();
+    log('✅ GET getExpenses — Status: ' + r2.status, 'ok', t2.substring(0, 500));
+
+    // Parse and check
+    try {
+      const json = JSON.parse(t2);
+      if (json.expenses) {
+        log('✅ JSON válido — ' + json.expenses.length + ' gastos encontrados', 'ok',
+          'Primeiro gasto: ' + JSON.stringify(json.expenses[0], null, 2).substring(0, 400));
+        // Check date format
+        if (json.expenses[0]) {
+          const d = json.expenses[0].date;
+          const isYMD = /^\d{4}-\d{2}-\d{2}$/.test(String(d));
+          log(isYMD ? '✅ Formato de data OK: ' + d : '⚠️ Formato de data INCORRETO: ' + d,
+            isYMD ? 'ok' : 'err',
+            isYMD ? 'Data já está no formato YYYY-MM-DD' : 'Data deveria ser YYYY-MM-DD mas veio: ' + d);
+        }
+      } else {
+        log('⚠️ JSON retornado mas sem campo expenses', 'warn', JSON.stringify(json));
+      }
+    } catch(pe) {
+      log('❌ Resposta não é JSON válido', 'err', pe + '\n\nResposta bruta:\n' + t2.substring(0, 500));
+    }
+  } catch(e) {
+    log('❌ GET getExpenses falhou', 'err', e.toString());
+  }
+
+  // Step 3: POST test
+  log('⏳ Testando POST (no-cors)...', 'warn');
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'ping', test: true })
+    });
+    log('✅ POST no-cors executado sem erro', 'ok', 'POST funciona corretamente');
+  } catch(e) {
+    log('❌ POST falhou', 'err', e.toString());
+  }
+
+  log('🏁 Diagnóstico concluído — envie os resultados para o suporte', 'ok');
+}
+</script>
+</body>
+</html>
