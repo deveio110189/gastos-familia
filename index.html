@@ -1555,6 +1555,9 @@ async function syncNow(silent) {
 function startSyncPolling() {
   if (syncPollingTimer) clearInterval(syncPollingTimer);
   if (!config.scriptUrl) return;
+  // Push local config to Sheets immediately (in case never synced before)
+  syncConfig();
+  syncRecurring();
   // Fetch immediately on start
   fetchFromSheets(true);
   // Then every 60s
@@ -1565,7 +1568,11 @@ function startSyncPolling() {
 
 // Sync when app comes back from background
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && config.scriptUrl) fetchFromSheets(true);
+  if (!document.hidden && config.scriptUrl) {
+    syncConfig();
+    syncRecurring();
+    fetchFromSheets(true);
+  }
 });
 
 function updateSyncBadge(state) {
@@ -1602,6 +1609,22 @@ function saveConfig() {
   localStorage.setItem('fin_config', JSON.stringify(config));
   showToast('✅ Configuração salva!');
   startSyncPolling();
+}
+
+async function forceSyncAll() {
+  if (!config.scriptUrl) { showToast('⚠️ Configure o Apps Script primeiro'); return; }
+  showToast('⏳ Enviando tudo ao Sheets...');
+  updateSyncBadge('syncing');
+  // Push all data to Sheets
+  await syncConfig();
+  await syncRecurring();
+  // Push unsynced expenses
+  const unsynced = expenses.filter(e => !e.synced);
+  for (const e of unsynced) await syncExpense(e, 'addExpense');
+  // Then fetch everything back
+  await fetchFromSheets(true);
+  showToast('✅ Tudo sincronizado com o Sheets!');
+  updateSyncBadge(true);
 }
 
 function clearData() {
