@@ -900,6 +900,7 @@ function loadCategories() {
 function saveCategories() {
   localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
   localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
+  syncConfig();
 }
 function getAllCategories() { return [...CATEGORIES, ...customCategories]; }
 
@@ -936,6 +937,8 @@ function init() {
   loadCategories();
   loadRecurring();
   setTimeout(checkAndLaunchRecurring, 1500);
+  setTimeout(() => fetchConfig(true), 3000);
+  setTimeout(() => fetchRecurring(true), 4000);
   loadFromStorage();
   renderCategoryGrid();
   setDefaultDate();
@@ -1388,6 +1391,7 @@ function saveBudget() {
   localStorage.setItem('fin_budget', val.toString());
   updateHeader();
   showToast(val > 0 ? `✅ Orçamento de ${fmtCurrency(val)} salvo!` : '✅ Orçamento desativado');
+  syncConfig();
 }
 
 // ── Sync ──
@@ -1521,6 +1525,10 @@ async function fetchFromSheets(silent) {
     } else if (!silent) {
       showToast('✅ Tudo já atualizado!');
     }
+
+    // Also sync config (categories, budgets) and recurring
+    fetchConfig(true);
+    fetchRecurring(true);
 
   } catch(e) {
     console.log('fetchFromSheets error:', e);
@@ -1911,7 +1919,10 @@ function loadRecurring() {
   const r = localStorage.getItem('fin_recurring');
   if (r) recurringExpenses = JSON.parse(r);
 }
-function saveRecurring() { localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses)); }
+function saveRecurring() {
+  localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses));
+  syncRecurring();
+}
 
 function checkAndLaunchRecurring() {
   const today = new Date();
@@ -2233,6 +2244,165 @@ function jumpToMonth(prefix) {
   renderExpenses();
   showScreen('home');
   showToast(`📅 Exibindo ${prefix}`);
+}
+
+// ════════════════════════════════════════════
+// CONFIG SYNC — categories, budgets, overrides
+// ════════════════════════════════════════════
+
+async function syncConfig() {
+  if (!config.scriptUrl) return;
+  const overrides = JSON.parse(localStorage.getItem('fin_cat_overrides') || '{}');
+  const configData = {
+    customCategories,
+    categoryBudgets,
+    budget,
+    catOverrides: overrides,
+    updatedAt: new Date().toISOString()
+  };
+  try {
+    await fetch(config.scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'saveConfig', configData })
+    });
+  } catch(e) { console.log('syncConfig error:', e); }
+}
+
+async function syncRecurring() {
+  if (!config.scriptUrl) return;
+  try {
+    await fetch(config.scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'saveRecurring',
+        recurringData: { recurringExpenses, updatedAt: new Date().toISOString() }
+      })
+    });
+  } catch(e) { console.log('syncRecurring error:', e); }
+}
+
+async function fetchRecurring(silent) {
+  if (!config.scriptUrl) return;
+  try {
+    const url = config.scriptUrl + '?action=getRecurring&t=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { return; }
+    if (!data.recurringData) return;
+
+    const remote = data.recurringData;
+    const localUpdated = localStorage.getItem('fin_recurring_updated') || '';
+    const remoteUpdated = remote.updatedAt || '';
+
+    if (remoteUpdated <= localUpdated) return;
+
+    if (remote.recurringExpenses && Array.isArray(remote.recurringExpenses)) {
+      const localIds = new Set(recurringExpenses.map(r => r.id));
+      let added = 0;
+      remote.recurringExpenses.forEach(rr => {
+        if (!localIds.has(rr.id)) {
+          recurringExpenses.push(rr);
+          added++;
+        } else {
+          // Update existing if remote is newer
+          const idx = recurringExpenses.findIndex(x => x.id === rr.id);
+          recurringExpenses[idx] = rr;
+        }
+      });
+      localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses));
+      localStorage.setItem('fin_recurring_updated', remoteUpdated);
+      if (document.getElementById('screen-recur') &&
+          document.getElementById('screen-recur').classList.contains('active')) {
+        renderRecurList();
+      }
+      if (added > 0 && !silent) showToast('🔄 ' + added + ' gasto(s) fixo(s) recebido(s)!');
+    }
+  } catch(e) { console.log('fetchRecurring error:', e); }
+}
+
+async function fetchConfig(silent) {
+  if (!config.scriptUrl) return;
+  try {
+    const url = config.scriptUrl + '?action=getConfig&t=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { return; }
+    if (!data.configData) return;
+
+    const remote = data.configData;
+    const localUpdated = localStorage.getItem('fin_config_updated') || '';
+    const remoteUpdated = remote.updatedAt || '';
+
+    // Only update if remote is newer
+    if (remoteUpdated <= localUpdated) {
+      if (!silent) showToast('✅ Configurações já atualizadas!');
+      return;
+    }
+
+    let changed = false;
+
+    // Sync custom categories
+    if (remote.customCategories && Array.isArray(remote.customCategories)) {
+      const localIds = new Set(customCategories.map(c => c.id));
+      remote.customCategories.forEach(rc => {
+        if (!localIds.has(rc.id)) { customCategories.push(rc); changed = true; }
+      });
+      localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+    }
+
+    // Sync category budgets
+    if (remote.categoryBudgets && typeof remote.categoryBudgets === 'object') {
+      Object.entries(remote.categoryBudgets).forEach(([id, val]) => {
+        if (!categoryBudgets[id]) { categoryBudgets[id] = val; changed = true; }
+      });
+      localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
+    }
+
+    // Sync global budget
+    if (remote.budget && remote.budget > 0 && remote.budget !== budget) {
+      budget = remote.budget;
+      localStorage.setItem('fin_budget', budget.toString());
+      const bi = document.getElementById('budgetInput');
+      if (bi) bi.value = budget.toFixed(2);
+      changed = true;
+    }
+
+    // Sync category overrides (renamed default categories)
+    if (remote.catOverrides && typeof remote.catOverrides === 'object') {
+      const localOverrides = JSON.parse(localStorage.getItem('fin_cat_overrides') || '{}');
+      let overrideChanged = false;
+      Object.entries(remote.catOverrides).forEach(([id, data]) => {
+        if (!localOverrides[id]) {
+          localOverrides[id] = data;
+          const cat = CATEGORIES.find(c => c.id === id);
+          if (cat) { cat.label = data.label; cat.icon = data.icon; }
+          overrideChanged = true;
+        }
+      });
+      if (overrideChanged) {
+        localStorage.setItem('fin_cat_overrides', JSON.stringify(localOverrides));
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      localStorage.setItem('fin_config_updated', remoteUpdated);
+      renderCategoryGrid();
+      renderCatScreen();
+      updateHeader();
+      if (!silent) showToast('🔄 Configurações sincronizadas!');
+      else showToast('🔄 Novas configurações recebidas!');
+    }
+
+  } catch(e) { console.log('fetchConfig error:', e); }
 }
 
 // ── Toast ──
