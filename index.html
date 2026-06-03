@@ -2284,27 +2284,24 @@ async function syncConfig() {
     updatedAt: new Date().toISOString()
   };
   try {
-    await fetch(config.scriptUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'saveConfig', configData })
-    });
+    // Use GET with encoded payload — avoids no-cors POST limitation
+    const payload = encodeURIComponent(JSON.stringify(configData));
+    const url = config.scriptUrl + '?action=saveConfig&data=' + payload + '&t=' + Date.now();
+    const res = await fetch(url);
+    const result = await res.json();
+    console.log('syncConfig result:', result);
   } catch(e) { console.log('syncConfig error:', e); }
 }
 
 async function syncRecurring() {
   if (!config.scriptUrl) return;
   try {
-    await fetch(config.scriptUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'saveRecurring',
-        recurringData: { recurringExpenses, updatedAt: new Date().toISOString() }
-      })
-    });
+    const recurringData = { recurringExpenses, updatedAt: new Date().toISOString() };
+    const payload = encodeURIComponent(JSON.stringify(recurringData));
+    const url = config.scriptUrl + '?action=saveRecurring&data=' + payload + '&t=' + Date.now();
+    const res = await fetch(url);
+    const result = await res.json();
+    console.log('syncRecurring result:', result);
   } catch(e) { console.log('syncRecurring error:', e); }
 }
 
