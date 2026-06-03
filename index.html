@@ -358,6 +358,50 @@
     .recur-progress-track { height: 4px; background: var(--gray-100); border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
     .recur-progress-fill { height: 100%; border-radius: 2px; background: var(--green-500); }
     .recur-progress-label { font-size: 10px; color: var(--text-hint); font-family: var(--mono); }
+
+    /* ── Compact view mode ── */
+    .expense-item.compact { padding: 7px 0; gap: 8px; }
+    .expense-item.compact .expense-cat-icon { width: 32px; height: 32px; font-size: 15px; border-radius: 8px; }
+    .expense-item.compact .expense-desc { font-size: 13px; }
+    .expense-item.compact .expense-meta { font-size: 10px; }
+    .expense-item.compact .expense-amount { font-size: 13px; }
+    .expense-item.compact .expense-action-btn { width: 24px; height: 24px; font-size: 11px; }
+    .view-toggle { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
+    .view-btn { padding: 5px 10px; border-radius: 20px; border: 1.5px solid var(--border-strong); background: var(--surface-raised); font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; font-family: var(--font); transition: all 0.15s; }
+    .view-btn.active { background: var(--green-500); border-color: var(--green-500); color: #fff; }
+
+    /* ── Installment selector ── */
+    .installment-wrap { display: flex; gap: 8px; align-items: center; }
+    .installment-toggle { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface-raised); cursor: pointer; transition: all 0.15s; }
+    .installment-toggle.active { border-color: var(--green-500); background: var(--green-50); }
+    .installment-toggle-label { font-size: 14px; font-weight: 500; color: var(--text-muted); }
+    .installment-toggle.active .installment-toggle-label { color: var(--green-900); }
+    .installment-fields { display: flex; gap: 8px; margin-top: 8px; }
+    .installment-fields .text-input { flex: 1; }
+    .installment-badge { font-size: 11px; background: var(--green-50); color: var(--green-900); padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+
+    /* ── Sync timestamp ── */
+    .sync-time { font-size: 10px; color: var(--text-hint); margin-left: 4px; }
+
+    /* ── Category comparison ── */
+    .cat-compare-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .cat-compare-row:last-child { border-bottom: none; }
+    .cat-compare-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+    .cat-compare-info { flex: 1; min-width: 0; }
+    .cat-compare-name { font-size: 13px; font-weight: 600; }
+    .cat-compare-amounts { font-size: 11px; color: var(--text-hint); }
+    .cat-compare-diff { font-size: 12px; font-weight: 700; flex-shrink: 0; display: flex; align-items: center; gap: 3px; }
+    .diff-up { color: var(--red-700); }
+    .diff-down { color: var(--green-700); }
+    .diff-same { color: var(--text-hint); }
+
+    /* ── Quick categories in add modal ── */
+    .quick-cats-wrap { margin-bottom: 8px; }
+    .quick-cats-label { font-size: 11px; font-weight: 600; color: var(--text-hint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .quick-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+    .quick-cat-btn { display: flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface-raised); cursor: pointer; font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text-muted); transition: all 0.15s; }
+    .quick-cat-btn.selected { border-color: var(--green-500); background: var(--green-50); color: var(--green-900); }
+    .quick-cat-btn:active { transform: scale(0.95); }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -430,9 +474,14 @@
   <div class="screens">
     <!-- Home -->
     <div class="screen active" id="screen-home">
-      <div id="syncBadge" class="sync-badge sync-ok"><span class="status-dot dot-green"></span> Sincronizado</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        <div id="syncBadge" class="sync-badge sync-ok"><span class="status-dot dot-green"></span> Sincronizado<span class="sync-time" id="syncTime"></span></div>
+        <div class="view-toggle">
+          <button class="view-btn active" id="viewNormal" onclick="setViewMode('normal')">≡ Normal</button>
+          <button class="view-btn" id="viewCompact" onclick="setViewMode('compact')">⊟ Compacto</button>
+        </div>
+      </div>
       <div id="budgetAlertWrap"></div>
-      <div class="card-title">Lançamentos</div>
       <div id="expenseList"></div>
     </div>
 
@@ -479,6 +528,14 @@
       <div class="card">
         <div class="card-title">Por categoria</div>
         <div class="bar-chart" id="categoryChart"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Comparativo mês anterior</span>
+          <span style="font-size:10px;color:var(--text-hint);font-weight:500" id="compareMonthLabel"></span>
+        </div>
+        <div id="categoryCompare"></div>
       </div>
 
       <div class="card">
@@ -859,6 +916,10 @@
 
       <div class="form-group">
         <label class="form-label">Categoria</label>
+        <div class="quick-cats-wrap" id="quickCatsWrap">
+          <div class="quick-cats-label">⚡ Mais usadas este mês</div>
+          <div class="quick-cats" id="quickCats"></div>
+        </div>
         <div class="cat-grid" id="catGrid"></div>
       </div>
 
@@ -870,6 +931,28 @@
       <div class="form-group">
         <label class="form-label">Data</label>
         <input type="date" class="text-input" id="dateInput" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Parcelado?</label>
+        <div class="installment-toggle" id="installmentToggle" onclick="toggleInstallment()">
+          <span style="font-size:18px">💳</span>
+          <span class="installment-toggle-label">Dividir em parcelas</span>
+          <span id="installmentBadge" style="display:none" class="installment-badge"></span>
+        </div>
+        <div id="installmentFields" style="display:none">
+          <div class="installment-fields" style="margin-top:8px">
+            <div style="flex:1">
+              <label style="font-size:11px;color:var(--text-hint);font-weight:600;display:block;margin-bottom:4px">Nº DE PARCELAS</label>
+              <input type="number" class="text-input" id="installmentCount" placeholder="Ex: 12" min="2" max="60" inputmode="numeric" oninput="updateInstallmentPreview()" />
+            </div>
+            <div style="flex:1">
+              <label style="font-size:11px;color:var(--text-hint);font-weight:600;display:block;margin-bottom:4px">VALOR TOTAL</label>
+              <input type="text" class="text-input" id="installmentTotal" placeholder="0,00" inputmode="numeric" oninput="updateInstallmentPreview()" />
+            </div>
+          </div>
+          <div id="installmentPreview" style="font-size:12px;color:var(--green-700);font-weight:600;margin-top:6px;padding:8px;background:var(--green-50);border-radius:8px;display:none"></div>
+        </div>
       </div>
 
       <button class="btn-primary" id="submitBtn" onclick="submitExpense()">Adicionar gasto</button>
@@ -900,7 +983,6 @@ function loadCategories() {
 function saveCategories() {
   localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
   localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
-  syncConfig();
 }
 function getAllCategories() { return [...CATEGORIES, ...customCategories]; }
 
@@ -937,8 +1019,7 @@ function init() {
   loadCategories();
   loadRecurring();
   setTimeout(checkAndLaunchRecurring, 1500);
-  setTimeout(() => fetchConfig(true), 3000);
-  setTimeout(() => fetchRecurring(true), 4000);
+
   loadFromStorage();
   renderCategoryGrid();
   setDefaultDate();
@@ -1101,9 +1182,21 @@ function openAddModal(editId = null) {
     selectPerson('Welinton');
   }
 
+  // Reset installment
+  installmentActive = false;
+  document.getElementById('installmentToggle').classList.remove('active');
+  document.getElementById('installmentFields').style.display = 'none';
+  document.getElementById('installmentBadge').style.display = 'none';
+  document.getElementById('installmentPreview').style.display = 'none';
+  document.getElementById('installmentCount').value = '';
+  document.getElementById('installmentTotal').value = '';
+
   document.getElementById('addModal').classList.add('open');
   history.pushState({ modal: 'add' }, '', '');
-  setTimeout(() => document.getElementById('amountInput').focus(), 350);
+  setTimeout(() => {
+    renderQuickCats();
+    document.getElementById('amountInput').focus();
+  }, 350);
 }
 
 function closeModal() { document.getElementById('addModal').classList.remove('open'); }
@@ -1158,6 +1251,40 @@ async function submitExpense() {
     showToast('✏️ Gasto atualizado!');
     syncExpense(expenses.find(e => e.id === editingId), 'updateExpense');
   } else {
+    if (installmentActive) {
+      const count = parseInt(document.getElementById('installmentCount').value) || 0;
+      const rawTotal = document.getElementById('installmentTotal').value.replace(/\./g,'').replace(',','.');
+      const total = parseFloat(rawTotal) || 0;
+      if (count >= 2 && total > 0) {
+        const perMonth = total / count;
+        const baseId = Date.now().toString(36);
+        const baseDate = new Date(date + 'T12:00:00');
+        for (let i = 0; i < count; i++) {
+          const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, baseDate.getDate());
+          const iDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          const installment = {
+            id: baseId + '_p' + (i+1),
+            person: selectedPerson, amount: perMonth,
+            category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
+            description: `${desc||cat.label} (${i+1}/${count})`,
+            date: iDate, createdAt: new Date().toISOString(), synced: false,
+            isInstallment: true, installmentNum: i+1, installmentTotal: count
+          };
+          expenses.unshift(installment);
+          syncExpense(installment);
+        }
+        expenses.sort((a,b) => b.date.localeCompare(a.date));
+        saveToStorage();
+        closeModal();
+        updateHeader();
+        renderExpenses();
+        renderStats();
+        vibrate(40);
+        showToast(`💳 ${count} parcelas de ${fmtCurrency(perMonth)} lançadas!`);
+        return;
+      }
+    }
+
     const expense = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, createdAt: new Date().toISOString(), synced: false };
     expenses.unshift(expense);
     saveToStorage();
@@ -1322,6 +1449,9 @@ function renderStats() {
   // Pie chart
   renderPie(wTotal, dTotal);
 
+  // Category comparison
+  renderCategoryComparison();
+
   // Bar chart
   const cats = {};
   month.forEach(e => { if (!cats[e.categoryLabel]) cats[e.categoryLabel] = {sum:0,icon:e.categoryIcon}; cats[e.categoryLabel].sum+=e.amount; });
@@ -1391,7 +1521,6 @@ function saveBudget() {
   localStorage.setItem('fin_budget', val.toString());
   updateHeader();
   showToast(val > 0 ? `✅ Orçamento de ${fmtCurrency(val)} salvo!` : '✅ Orçamento desativado');
-  syncConfig();
 }
 
 // ── Sync ──
@@ -1514,6 +1643,8 @@ async function fetchFromSheets(silent) {
     updateHeader();
     renderExpenses();
     if (document.getElementById('screen-stats').classList.contains('active')) renderStats();
+    localStorage.setItem('fin_last_sync', new Date().toISOString());
+    updateSyncTime();
     updateSyncBadge(true);
 
     if (added > 0 || updated > 0 || removed > 0) {
@@ -1526,9 +1657,7 @@ async function fetchFromSheets(silent) {
       showToast('✅ Tudo já atualizado!');
     }
 
-    // Also sync config (categories, budgets) and recurring
-    fetchConfig(true);
-    fetchRecurring(true);
+    // Config sync removed - categories managed locally
 
   } catch(e) {
     console.log('fetchFromSheets error:', e);
@@ -1555,9 +1684,6 @@ async function syncNow(silent) {
 function startSyncPolling() {
   if (syncPollingTimer) clearInterval(syncPollingTimer);
   if (!config.scriptUrl) return;
-  // Push local config to Sheets immediately (in case never synced before)
-  syncConfig();
-  syncRecurring();
   // Fetch immediately on start
   fetchFromSheets(true);
   // Then every 60s
@@ -1569,8 +1695,6 @@ function startSyncPolling() {
 // Sync when app comes back from background
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && config.scriptUrl) {
-    syncConfig();
-    syncRecurring();
     fetchFromSheets(true);
   }
 });
@@ -1609,6 +1733,17 @@ function saveConfig() {
   localStorage.setItem('fin_config', JSON.stringify(config));
   showToast('✅ Configuração salva!');
   startSyncPolling();
+}
+
+async function forceSyncAll() {
+  if (!config.scriptUrl) { showToast('⚠️ Configure o Apps Script primeiro'); return; }
+  showToast('⏳ Enviando tudo ao Sheets...');
+  updateSyncBadge('syncing');
+  const unsynced = expenses.filter(e => !e.synced);
+  for (const e of unsynced) await syncExpense(e, 'addExpense');
+  await fetchFromSheets(true);
+  showToast('✅ Tudo sincronizado!');
+  updateSyncBadge(true);
 }
 
 async function forceSyncAll() {
@@ -1944,7 +2079,6 @@ function loadRecurring() {
 }
 function saveRecurring() {
   localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses));
-  syncRecurring();
 }
 
 function checkAndLaunchRecurring() {
@@ -2423,6 +2557,163 @@ async function fetchConfig(silent) {
     }
 
   } catch(e) { console.log('fetchConfig error:', e); }
+}
+
+// ════════════════════════════════════════════
+// COMPACT VIEW MODE
+// ════════════════════════════════════════════
+let viewMode = localStorage.getItem('fin_view_mode') || 'normal';
+
+function setViewMode(mode) {
+  viewMode = mode;
+  localStorage.setItem('fin_view_mode', mode);
+  document.getElementById('viewNormal').classList.toggle('active', mode === 'normal');
+  document.getElementById('viewCompact').classList.toggle('active', mode === 'compact');
+  renderExpenses();
+}
+
+// ════════════════════════════════════════════
+// SYNC TIMESTAMP
+// ════════════════════════════════════════════
+function updateSyncTime() {
+  const el = document.getElementById('syncTime');
+  if (!el) return;
+  const last = localStorage.getItem('fin_last_sync');
+  if (!last) { el.textContent = ''; return; }
+  const diff = Math.floor((Date.now() - new Date(last).getTime()) / 1000);
+  if (diff < 60) el.textContent = ' · agora';
+  else if (diff < 3600) el.textContent = ` · há ${Math.floor(diff/60)}min`;
+  else el.textContent = ` · há ${Math.floor(diff/3600)}h`;
+}
+setInterval(updateSyncTime, 30000);
+
+// ════════════════════════════════════════════
+// INSTALLMENT (PARCELADO)
+// ════════════════════════════════════════════
+let installmentActive = false;
+
+function toggleInstallment() {
+  installmentActive = !installmentActive;
+  document.getElementById('installmentToggle').classList.toggle('active', installmentActive);
+  document.getElementById('installmentFields').style.display = installmentActive ? 'block' : 'none';
+  if (!installmentActive) {
+    document.getElementById('installmentBadge').style.display = 'none';
+    document.getElementById('installmentPreview').style.display = 'none';
+    document.getElementById('installmentCount').value = '';
+    document.getElementById('installmentTotal').value = '';
+  }
+}
+
+function updateInstallmentPreview() {
+  const count = parseInt(document.getElementById('installmentCount').value) || 0;
+  const rawTotal = document.getElementById('installmentTotal').value.replace(/\./g,'').replace(',','.');
+  const total = parseFloat(rawTotal) || 0;
+  const preview = document.getElementById('installmentPreview');
+  const badge = document.getElementById('installmentBadge');
+
+  if (count >= 2 && total > 0) {
+    const perMonth = total / count;
+    preview.style.display = 'block';
+    preview.textContent = `${count}x de ${fmtCurrency(perMonth)} = ${fmtCurrency(total)} no total`;
+    badge.style.display = 'inline';
+    badge.textContent = `${count}x`;
+    // Update main amount field with per-month value
+    document.getElementById('amountInput').value = perMonth.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  } else {
+    preview.style.display = 'none';
+    badge.style.display = 'none';
+  }
+}
+
+// ════════════════════════════════════════════
+// QUICK CATEGORIES (top 3 this month)
+// ════════════════════════════════════════════
+function renderQuickCats() {
+  const prefix = getViewMonthPrefix();
+  const monthExp = expenses.filter(e => e.date.startsWith(prefix));
+  const counts = {};
+  monthExp.forEach(e => { counts[e.category] = (counts[e.category]||0) + 1; });
+  const top3 = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id]) => id);
+
+  const wrap = document.getElementById('quickCatsWrap');
+  const qc = document.getElementById('quickCats');
+  if (!top3.length) { if(wrap) wrap.style.display='none'; return; }
+  if(wrap) wrap.style.display='block';
+
+  const allCats = getAllCategories();
+  if(qc) qc.innerHTML = top3.map(id => {
+    const cat = allCats.find(c=>c.id===id);
+    if (!cat) return '';
+    return `<button class="quick-cat-btn ${selectedCategory===id?'selected':''}" id="qcat-${id}" onclick="selectCategory('${id}');updateQuickCatSelection('${id}')">
+      ${cat.icon} ${cat.label}
+    </button>`;
+  }).join('');
+}
+
+function updateQuickCatSelection(id) {
+  document.querySelectorAll('.quick-cat-btn').forEach(b => b.classList.remove('selected'));
+  const el = document.getElementById('qcat-'+id);
+  if (el) el.classList.add('selected');
+}
+
+// ════════════════════════════════════════════
+// CATEGORY COMPARISON (month vs previous)
+// ════════════════════════════════════════════
+function renderCategoryComparison() {
+  const { year, month } = getViewMonth();
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  // Current month
+  const curPrefix = `${year}-${String(month).padStart(2,'0')}`;
+  // Previous month
+  const prevDate = new Date(year, month-2, 1);
+  const prevPrefix = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
+  const prevLabel = months[prevDate.getMonth()];
+
+  const labelEl = document.getElementById('compareMonthLabel');
+  if (labelEl) labelEl.textContent = `vs ${prevLabel}/${prevDate.getFullYear()}`;
+
+  const curExp = expenses.filter(e => e.date.startsWith(curPrefix));
+  const prevExp = expenses.filter(e => e.date.startsWith(prevPrefix));
+
+  // Group by category
+  const curByCat = {};
+  curExp.forEach(e => { curByCat[e.categoryLabel] = (curByCat[e.categoryLabel]||{sum:0,icon:e.categoryIcon}); curByCat[e.categoryLabel].sum+=e.amount; });
+  const prevByCat = {};
+  prevExp.forEach(e => { prevByCat[e.categoryLabel] = (prevByCat[e.categoryLabel]||{sum:0,icon:e.categoryIcon}); prevByCat[e.categoryLabel].sum+=e.amount; });
+
+  // Merge all categories
+  const allLabels = new Set([...Object.keys(curByCat), ...Object.keys(prevByCat)]);
+  const rows = Array.from(allLabels).map(label => ({
+    label,
+    icon: (curByCat[label]||prevByCat[label]).icon,
+    cur: curByCat[label]?.sum || 0,
+    prev: prevByCat[label]?.sum || 0,
+  })).sort((a,b) => b.cur - a.cur).slice(0,8);
+
+  const container = document.getElementById('categoryCompare');
+  if (!container) return;
+
+  if (!rows.length) { container.innerHTML = '<p style="font-size:13px;color:var(--text-hint);text-align:center;padding:16px 0">Sem dados para comparar</p>'; return; }
+
+  container.innerHTML = rows.map(r => {
+    const diff = r.cur - r.prev;
+    const pct = r.prev > 0 ? ((diff/r.prev)*100).toFixed(0) : null;
+    let diffClass = 'diff-same', diffIcon = '→', diffText = 'novo';
+    if (r.prev > 0) {
+      if (diff > 0) { diffClass='diff-up'; diffIcon='↑'; diffText=`+${pct}%`; }
+      else if (diff < 0) { diffClass='diff-down'; diffIcon='↓'; diffText=`${pct}%`; }
+      else { diffClass='diff-same'; diffIcon='→'; diffText='igual'; }
+    }
+    return `<div class="cat-compare-row">
+      <div class="cat-compare-icon">${r.icon}</div>
+      <div class="cat-compare-info">
+        <div class="cat-compare-name">${r.label}</div>
+        <div class="cat-compare-amounts">${fmtCurrency(r.cur)} este mês · ${r.prev>0?fmtCurrency(r.prev)+' anterior':'sem dados anteriores'}</div>
+      </div>
+      <div class="cat-compare-diff ${diffClass}">${diffIcon} ${diffText}</div>
+    </div>`;
+  }).join('');
 }
 
 // ── Toast ──
