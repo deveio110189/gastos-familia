@@ -1453,15 +1453,47 @@ async function fetchFromSheets(silent) {
       const deletedIds = new Set(data.deletedIds || []);
       let added = 0, updated = 0, removed = 0;
 
+      // ── Helper: normalize date to YYYY-MM-DD ──
+      function normalizeDate(raw) {
+        if (!raw) return new Date().toISOString().split('T')[0];
+        // Already in YYYY-MM-DD format
+        if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw))) return String(raw);
+        // Try parsing any other format (e.g. "Wed Apr 01 2026 00:00:00 GMT-0300")
+        try {
+          const d = new Date(raw);
+          if (!isNaN(d)) {
+            // Use local date parts to avoid timezone shift
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          }
+        } catch(e) {}
+        return String(raw).split('T')[0] || new Date().toISOString().split('T')[0];
+      }
+
+      // ── Helper: get category icon from label ──
+      function getIconFromLabel(label) {
+        const cat = getAllCategories().find(c => c.label === label || c.categoryLabel === label);
+        return cat ? cat.icon : '📋';
+      }
+
       // Add or update expenses from Sheets
       data.expenses.forEach(remote => {
-        if (deletedIds.has(remote.id)) return; // skip if deleted
+        if (deletedIds.has(remote.id)) return;
+
+        // Normalize date
+        remote.date = normalizeDate(remote.date);
+
+        // Fix missing icon
+        if (!remote.categoryIcon || remote.categoryIcon === '📋') {
+          remote.categoryIcon = getIconFromLabel(remote.categoryLabel) || '📋';
+        }
+
         if (!localIds.has(remote.id)) {
-          // New expense from other device
           expenses.push({ ...remote, synced: true });
           added++;
         } else {
-          // Update local if remote has newer updatedAt
           const local = expenses.find(x => x.id === remote.id);
           if (local && remote.updatedAt && (!local.updatedAt || remote.updatedAt > local.updatedAt)) {
             const idx = expenses.findIndex(x => x.id === remote.id);
@@ -1488,6 +1520,8 @@ async function fetchFromSheets(silent) {
         if (updated > 0) msg.push(`${updated} atualizado(s)`);
         if (removed > 0) msg.push(`${removed} removido(s)`);
         showToast(`🔄 ${msg.join(', ')}`);
+      } else {
+        updateSyncBadge(true);
       }
       updateSyncBadge(true);
     }
