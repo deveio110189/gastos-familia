@@ -960,6 +960,8 @@ function init() {
     config = JSON.parse(savedConfig);
     document.getElementById('scriptUrl').value = config.scriptUrl || '';
   }
+  // Start auto sync polling if already configured
+  setTimeout(() => startSyncPolling(), 2000);
   const savedBudget = localStorage.getItem('fin_budget');
   if (savedBudget) {
     budget = parseFloat(savedBudget) || 0;
@@ -1142,7 +1144,7 @@ async function submitExpense() {
     // Edit existing
     const idx = expenses.findIndex(e => e.id === editingId);
     if (idx !== -1) {
-      expenses[idx] = { ...expenses[idx], person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, synced: false };
+      expenses[idx] = { ...expenses[idx], person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, synced: false, updatedAt: new Date().toISOString() };
     }
     saveToStorage();
     closeModal();
@@ -1389,77 +1391,160 @@ function saveBudget() {
 }
 
 // ── Sync ──
+// ════════════════════════════════════════════
+// SYNC ENGINE — bidirectional real-time
+// ════════════════════════════════════════════
+let syncPollingTimer = null;
+const SYNC_INTERVAL = 60000; // 60 seconds
+
+// ── Send one expense to Sheets ──
 async function syncExpense(expense, action) {
   if (!config.scriptUrl || !expense) return;
   action = action || 'addExpense';
   updateSyncBadge('syncing');
   try {
-    await fetch(config.scriptUrl, {
-      method: 'POST', mode: 'no-cors',
+    const res = await fetch(config.scriptUrl, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, expense })
     });
+    const data = await res.json();
     expense.synced = true;
     saveToStorage();
     updateSyncBadge(true);
     renderExpenses();
   } catch(e) {
-    expense.synced = false;
-    saveToStorage();
-    updateSyncBadge(false);
+    // Fallback no-cors (CORS not yet configured)
+    try {
+      await fetch(config.scriptUrl, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, expense })
+      });
+      expense.synced = true;
+      saveToStorage();
+      updateSyncBadge(true);
+      renderExpenses();
+    } catch(e2) {
+      expense.synced = false;
+      saveToStorage();
+      updateSyncBadge(false);
+    }
   }
 }
 
+// ── Delete from Sheets ──
 async function syncDelete(expenseId) {
   if (!config.scriptUrl) return;
   updateSyncBadge('syncing');
   try {
     await fetch(config.scriptUrl, {
-      method: 'POST', mode: 'no-cors',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'deleteExpense', expenseId })
     });
     updateSyncBadge(true);
-  } catch(e) { updateSyncBadge(false); }
-}
-
-async function syncNow() {
-  const unsynced = expenses.filter(e => !e.synced);
-  if (!unsynced.length) { showToast('✅ Tudo já sincronizado!'); return; }
-  showToast(`⏳ Sincronizando ${unsynced.length} lançamento(s)...`);
-  for (const e of unsynced) await syncExpense(e, 'addExpense');
-  const stillUnsynced = expenses.filter(e => !e.synced).length;
-  showToast(stillUnsynced === 0 ? '✅ Sincronização concluída!' : `⚠️ ${stillUnsynced} lançamento(s) falharam`);
-  renderExpenses();
-}
-
-// ── Fetch from Sheets (bidirectional sync) ──
-async function fetchFromSheets() {
-  if (!config.scriptUrl) { showToast('⚠️ Configure o Apps Script primeiro'); return; }
-  showToast('⏳ Buscando dados do Sheets...');
-  try {
-    const url = config.scriptUrl.replace('/exec', '/exec') + '?action=getExpenses';
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.expenses && Array.isArray(data.expenses)) {
-      let added = 0;
-      const existingIds = new Set(expenses.map(e => e.id));
-      data.expenses.forEach(e => {
-        if (!existingIds.has(e.id)) { expenses.push({ ...e, synced: true }); added++; }
+  } catch(e) {
+    try {
+      await fetch(config.scriptUrl, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deleteExpense', expenseId })
       });
-      if (added > 0) {
+      updateSyncBadge(true);
+    } catch(e2) { updateSyncBadge(false); }
+  }
+}
+
+// ── Push all unsynced to Sheets ──
+async function syncNow(silent) {
+  const unsynced = expenses.filter(e => !e.synced);
+  if (unsynced.length) {
+    if (!silent) showToast(`⏳ Enviando ${unsynced.length} lançamento(s)...`);
+    for (const e of unsynced) await syncExpense(e, 'addExpense');
+  }
+  // Also pull updates from Sheets
+  await fetchFromSheets(silent);
+  if (!silent) {
+    const still = expenses.filter(e => !e.synced).length;
+    if (still === 0) showToast('✅ Sincronização concluída!');
+    else showToast(`⚠️ ${still} lançamento(s) pendentes`);
+  }
+}
+
+// ── Pull data from Sheets ──
+async function fetchFromSheets(silent) {
+  if (!config.scriptUrl) {
+    if (!silent) showToast('⚠️ Configure o Apps Script primeiro');
+    return;
+  }
+  if (!silent) updateSyncBadge('syncing');
+  try {
+    const url = config.scriptUrl + '?action=getExpenses&t=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    if (data.expenses && Array.isArray(data.expenses)) {
+      const existingIds = new Set(expenses.map(e => e.id));
+      const deletedIds = new Set(data.deletedIds || []);
+      let added = 0, removed = 0;
+
+      // Add new expenses from other device
+      data.expenses.forEach(e => {
+        if (!existingIds.has(e.id)) {
+          expenses.push({ ...e, synced: true });
+          added++;
+        } else {
+          // Update if remote is newer
+          const local = expenses.find(x => x.id === e.id);
+          if (local && e.updatedAt && local.updatedAt && e.updatedAt > local.updatedAt) {
+            Object.assign(local, { ...e, synced: true });
+            added++;
+          }
+        }
+      });
+
+      // Remove deleted expenses from other device
+      deletedIds.forEach(id => {
+        const idx = expenses.findIndex(e => e.id === id);
+        if (idx !== -1) { expenses.splice(idx, 1); removed++; }
+      });
+
+      if (added > 0 || removed > 0) {
         expenses.sort((a,b) => b.date.localeCompare(a.date));
         saveToStorage();
         updateHeader();
         renderExpenses();
-        renderStats();
-        showToast(`✅ ${added} novo(s) lançamento(s) recebido(s)!`);
-      } else {
-        showToast('✅ Tudo já atualizado!');
+        if (document.getElementById('screen-stats').classList.contains('active')) renderStats();
+        if (!silent) showToast(`✅ ${added} novo(s), ${removed} removido(s)`);
+        else if (added > 0 || removed > 0) showToast(`🔄 ${added + removed} atualização(ões) recebida(s)`);
       }
+      updateSyncBadge(true);
     }
-  } catch(e) { showToast('❌ Falha ao buscar dados'); }
+  } catch(e) {
+    if (!silent) updateSyncBadge(false);
+  }
 }
+
+// ── Auto polling every 60s ──
+function startSyncPolling() {
+  if (syncPollingTimer) clearInterval(syncPollingTimer);
+  if (!config.scriptUrl) return;
+  // First fetch immediately
+  fetchFromSheets(true);
+  // Then poll every 60s
+  syncPollingTimer = setInterval(() => {
+    if (document.visibilityState !== 'hidden') fetchFromSheets(true);
+  }, SYNC_INTERVAL);
+}
+
+// Restart polling when app becomes visible
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && config.scriptUrl) {
+    fetchFromSheets(true);
+  }
+});
 
 function updateSyncBadge(state) {
   const b = document.getElementById('syncBadge');
@@ -1472,7 +1557,7 @@ function updateSyncBadge(state) {
   } else {
     b.className = 'sync-badge sync-error';
     b.innerHTML = '<span class="status-dot dot-red"></span> Sem conexão — toque para tentar';
-    b.onclick = () => syncNow();
+    b.onclick = () => syncNow(false);
     b.style.cursor = 'pointer';
   }
 }
@@ -1494,6 +1579,7 @@ function saveConfig() {
   config.scriptUrl = document.getElementById('scriptUrl').value.trim();
   localStorage.setItem('fin_config', JSON.stringify(config));
   showToast('✅ Configuração salva!');
+  startSyncPolling();
 }
 
 function clearData() {
