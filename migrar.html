@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Migração Sheets → Firebase</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f4f2eb; color: #1a1a18; max-width: 500px; margin: 0 auto; }
+  h2 { color: #0F6E56; margin-bottom: 4px; }
+  p { font-size: 13px; color: #666; margin-bottom: 16px; line-height: 1.5; }
+  label { font-size: 12px; font-weight: 700; color: #5F5E5A; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 6px; }
+  input { width: 100%; padding: 12px; border: 2px solid #D3D1C7; border-radius: 10px; font-size: 14px; box-sizing: border-box; margin-bottom: 14px; outline: none; }
+  input:focus { border-color: #0F6E56; }
+  button { width: 100%; padding: 14px; background: #0F6E56; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: background 0.15s; }
+  button:active { background: #085041; }
+  button:disabled { background: #D3D1C7; cursor: not-allowed; }
+  .step { background: white; border-radius: 10px; padding: 14px; margin-top: 10px; border-left: 4px solid #ccc; }
+  .step.ok { border-left-color: #1D9E75; }
+  .step.err { border-left-color: #E24B4A; }
+  .step.warn { border-left-color: #EF9F27; }
+  .step.info { border-left-color: #378ADD; }
+  .step-title { font-weight: 700; margin-bottom: 4px; font-size: 14px; }
+  .step-detail { font-size: 12px; color: #5F5E5A; line-height: 1.5; }
+  .progress { height: 6px; background: #ECEAE2; border-radius: 3px; overflow: hidden; margin: 10px 0; }
+  .progress-fill { height: 100%; background: #0F6E56; border-radius: 3px; transition: width 0.3s; }
+  .success-box { background: #E1F5EE; border-radius: 10px; padding: 16px; text-align: center; margin-top: 16px; display: none; }
+  .success-box .icon { font-size: 40px; margin-bottom: 8px; }
+  .success-box .title { font-size: 18px; font-weight: 700; color: #0F6E56; }
+  .success-box .desc { font-size: 13px; color: #5F5E5A; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h2>🔄 Migração de Dados</h2>
+<p>Esta ferramenta migra todos os seus gastos do Google Sheets para o Firebase automaticamente.</p>
+
+<label>URL do Google Apps Script</label>
+<input type="url" id="sheetsUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+
+<button id="btnMigrar" onclick="migrar()">🚀 Iniciar Migração</button>
+
+<div id="output"></div>
+
+<div class="success-box" id="successBox">
+  <div class="icon">🎉</div>
+  <div class="title">Migração concluída!</div>
+  <div class="desc" id="successDesc"></div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getDatabase, ref, set, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAV_wJwr42OhIHDc8LAg-XvjBiSQWvETSs",
+    authDomain: "gastos-familia-915e3.firebaseapp.com",
+    databaseURL: "https://gastos-familia-915e3-default-rtdb.firebaseio.com",
+    projectId: "gastos-familia-915e3",
+    storageBucket: "gastos-familia-915e3.firebasestorage.app",
+    messagingSenderId: "210608658131",
+    appId: "1:210608658131:web:b503b82c100fa02f386626"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  window._fb = { db, ref, set, get };
+  window.dispatchEvent(new Event('fb-ready'));
+</script>
+
+<script>
+let fbReady = false;
+window.addEventListener('fb-ready', () => { fbReady = true; log('✅ Firebase conectado!', 'ok'); });
+
+const out = document.getElementById('output');
+
+function log(title, type, detail) {
+  const d = document.createElement('div');
+  d.className = 'step ' + (type||'info');
+  d.innerHTML = '<div class="step-title">' + title + '</div>' + (detail ? '<div class="step-detail">' + detail + '</div>' : '');
+  out.appendChild(d);
+  d.scrollIntoView({ behavior: 'smooth' });
+  return d;
+}
+
+function fmtCurrency(v) {
+  return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+async function migrar() {
+  const url = document.getElementById('sheetsUrl').value.trim();
+  if (!url || !url.includes('script.google.com')) {
+    log('❌ Cole a URL do Apps Script primeiro', 'err');
+    return;
+  }
+  if (!fbReady) { log('⏳ Firebase ainda conectando, aguarde...', 'warn'); return; }
+
+  document.getElementById('btnMigrar').disabled = true;
+  out.innerHTML = '';
+  document.getElementById('successBox').style.display = 'none';
+
+  // Step 1: Fetch from Sheets
+  log('⏳ Buscando dados do Google Sheets...', 'warn');
+  let expenses = [];
+  try {
+    const res = await fetch(url + '?action=getExpenses&t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    expenses = data.expenses || [];
+    if (!expenses.length) {
+      log('⚠️ Nenhum gasto encontrado no Sheets', 'warn', 'Verifique se a URL está correta e se há dados na planilha.');
+      document.getElementById('btnMigrar').disabled = false;
+      return;
+    }
+    log('✅ ' + expenses.length + ' gastos encontrados no Sheets', 'ok',
+      'Período: ' + (expenses[expenses.length-1]?.date||'?') + ' até ' + (expenses[0]?.date||'?'));
+  } catch(e) {
+    log('❌ Erro ao buscar do Sheets: ' + e.message, 'err', 'Verifique se a URL está correta.');
+    document.getElementById('btnMigrar').disabled = false;
+    return;
+  }
+
+  // Step 2: Check existing Firebase data
+  log('⏳ Verificando Firebase...', 'warn');
+  const { db, ref, set, get } = window._fb;
+  try {
+    const snap = await get(ref(db, 'expenses'));
+    const existing = snap.val() ? Object.keys(snap.val()).length : 0;
+    if (existing > 0) log('ℹ️ Firebase já tem ' + existing + ' gasto(s) — novos serão adicionados sem duplicar', 'info');
+    else log('✅ Firebase vazio — todos os dados serão importados', 'ok');
+  } catch(e) { log('⚠️ Não consegui verificar Firebase: ' + e.message, 'warn'); }
+
+  // Step 3: Migrate
+  log('⏳ Migrando ' + expenses.length + ' gastos para o Firebase...', 'warn');
+  let success = 0, failed = 0;
+
+  for (let i = 0; i < expenses.length; i++) {
+    const e = expenses[i];
+    if (!e.id) { failed++; continue; }
+
+    // Normalize date
+    let date = String(e.date || '');
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const parsed = new Date(date);
+      if (!isNaN(parsed.getTime())) {
+        date = parsed.getFullYear() + '-' +
+          String(parsed.getMonth()+1).padStart(2,'0') + '-' +
+          String(parsed.getDate()).padStart(2,'0');
+      }
+    }
+
+    // Fix missing fields
+    const expense = {
+      id: e.id,
+      date: date,
+      person: e.person || 'Welinton',
+      category: e.category || 'outros',
+      categoryLabel: e.categoryLabel || 'Outros',
+      categoryIcon: e.categoryIcon || '📋',
+      description: e.description || e.categoryLabel || 'Gasto',
+      amount: Number(e.amount) || 0,
+      createdAt: e.createdAt || new Date().toISOString(),
+      updatedAt: e.updatedAt || e.createdAt || new Date().toISOString(),
+      synced: true
+    };
+
+    try {
+      await set(ref(db, 'expenses/' + expense.id), expense);
+      success++;
+    } catch(err) {
+      failed++;
+      console.log('Error migrating:', e.id, err);
+    }
+  }
+
+  // Step 4: Result
+  if (failed > 0) {
+    log('⚠️ ' + success + ' migrados, ' + failed + ' falharam', 'warn');
+  } else {
+    log('✅ Todos os ' + success + ' gastos migrados com sucesso!', 'ok');
+  }
+
+  // Show summary
+  const total = expenses.reduce((s, e) => s + (Number(e.amount)||0), 0);
+  document.getElementById('successBox').style.display = 'block';
+  document.getElementById('successDesc').textContent =
+    success + ' gastos migrados · Total: ' + fmtCurrency(total) +
+    (failed > 0 ? ' · ' + failed + ' falharam' : '');
+
+  document.getElementById('btnMigrar').disabled = false;
+  log('🎯 Abra o app agora — os gastos já devem aparecer!', 'ok', 'Se não aparecerem imediatamente, feche e reabra o app.');
+}
+</script>
+</body>
+</html>
