@@ -496,14 +496,11 @@
   <div class="screens">
     <!-- Home -->
     <div class="screen active" id="screen-home">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div id="syncBadge" class="sync-badge sync-ok"><span class="status-dot dot-green"></span> Sincronizado<span class="sync-time" id="syncTime"></span></div>
-        <div class="view-toggle">
-          <button class="view-btn active" id="viewNormal" onclick="setViewMode('normal')">≡ Normal</button>
-          <button class="view-btn" id="viewCompact" onclick="setViewMode('compact')">⊟ Compacto</button>
-        </div>
+        <button id="alertToggleBtn" onclick="toggleAlerts()" style="display:none;background:none;border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;color:var(--amber-700);background:var(--amber-50);border:1px solid var(--amber-200)"></button>
       </div>
-      <div id="budgetAlertWrap"></div>
+      <div id="budgetAlertWrap" style="display:none"></div>
       <div id="expenseList"></div>
     </div>
 
@@ -1487,6 +1484,8 @@ function updateHeader() {
   // Budget bar
   const wrap = document.getElementById('budgetBarWrap');
   const alertWrap = document.getElementById('budgetAlertWrap');
+  const allAlerts = [];
+
   if (budget > 0) {
     const pct = Math.min((total / budget) * 100, 100);
     const fill = document.getElementById('budgetBarFill');
@@ -1494,22 +1493,51 @@ function updateHeader() {
     fill.className = 'budget-bar-fill' + (pct >= 100 ? ' over' : pct >= 80 ? ' warn' : '');
     document.getElementById('budgetInfo').textContent = `${fmtCurrency(total)} de ${fmtCurrency(budget)} (${pct.toFixed(0)}%)`;
     wrap.style.display = 'block';
-
-    // Alert
-    if (pct >= 100) {
-      alertWrap.innerHTML = `<div class="budget-alert over">🚨 Orçamento estourado! Você gastou ${fmtCurrency(total - budget)} a mais.</div>`;
-    } else if (pct >= 80) {
-      alertWrap.innerHTML = `<div class="budget-alert warn">⚠️ Atenção! Você já usou ${pct.toFixed(0)}% do orçamento mensal.</div>`;
-    } else {
-      alertWrap.innerHTML = '';
-    }
+    if (pct >= 100) allAlerts.push(`<div class="budget-alert over">🚨 Orçamento geral estourado! Você gastou ${fmtCurrency(total - budget)} a mais.</div>`);
+    else if (pct >= 80) allAlerts.push(`<div class="budget-alert warn">⚠️ Você já usou ${pct.toFixed(0)}% do orçamento geral.</div>`);
   } else {
     wrap.style.display = 'none';
-    alertWrap.innerHTML = catAlerts.map(a=>`<div class="budget-alert warn">${a}</div>`).join('');
   }
-  if (budget > 0 && catAlerts.length) {
-    alertWrap.innerHTML += catAlerts.map(a=>`<div class="budget-alert warn" style="margin-top:4px">${a}</div>`).join('');
+
+  catAlerts.forEach(a => allAlerts.push(`<div class="budget-alert warn">${a}</div>`));
+  updateAlertButton(allAlerts);
+}
+
+// ── Alert toggle ──
+let alertsVisible = false;
+
+function updateAlertButton(allAlerts) {
+  const btn = document.getElementById('alertToggleBtn');
+  const alertWrapEl = document.getElementById('budgetAlertWrap');
+  if (!btn || !alertWrapEl) return;
+
+  if (!allAlerts.length) {
+    btn.style.display = 'none';
+    alertWrapEl.style.display = 'none';
+    alertWrapEl.innerHTML = '';
+    return;
   }
+
+  const critical = allAlerts.filter(a => a.includes('over') || a.includes('🚨')).length;
+  const icon = critical > 0 ? '🚨' : '⚠️';
+  const color = critical > 0 ? 'var(--red-700)' : 'var(--amber-700)';
+  const bg = critical > 0 ? 'var(--red-50)' : 'var(--amber-50)';
+  const borderColor = critical > 0 ? 'var(--red-200)' : 'var(--amber-200)';
+
+  btn.style.display = 'inline-flex';
+  btn.style.color = color;
+  btn.style.background = bg;
+  btn.style.borderColor = borderColor;
+  btn.innerHTML = `${icon} ${allAlerts.length} alerta${allAlerts.length > 1 ? 's' : ''} ${alertsVisible ? '▲' : '▼'}`;
+  alertWrapEl.innerHTML = allAlerts.join('');
+  alertWrapEl.style.display = alertsVisible ? 'block' : 'none';
+}
+
+function toggleAlerts() {
+  alertsVisible = !alertsVisible;
+  const alertWrapEl = document.getElementById('budgetAlertWrap');
+  if (alertWrapEl) alertWrapEl.style.display = alertsVisible ? 'block' : 'none';
+  updateHeader();
 }
 
 // ── Stats ──
@@ -2660,18 +2688,7 @@ async function fetchConfig(silent) {
   } catch(e) { console.log('fetchConfig error:', e); }
 }
 
-// ════════════════════════════════════════════
-// COMPACT VIEW MODE
-// ════════════════════════════════════════════
-let viewMode = localStorage.getItem('fin_view_mode') || 'normal';
-
-function setViewMode(mode) {
-  viewMode = mode;
-  localStorage.setItem('fin_view_mode', mode);
-  document.getElementById('viewNormal').classList.toggle('active', mode === 'normal');
-  document.getElementById('viewCompact').classList.toggle('active', mode === 'compact');
-  renderExpenses();
-}
+// View mode removed — always normal
 
 // ════════════════════════════════════════════
 // SYNC TIMESTAMP
