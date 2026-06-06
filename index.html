@@ -8,6 +8,28 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Gastos Família" />
   <title>Gastos Família</title>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getDatabase, ref, set, get, push, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAV_wJwr42OhIHDc8LAg-XvjBiSQWvETSs",
+      authDomain: "gastos-familia-915e3.firebaseapp.com",
+      databaseURL: "https://gastos-familia-915e3-default-rtdb.firebaseio.com",
+      projectId: "gastos-familia-915e3",
+      storageBucket: "gastos-familia-915e3.firebasestorage.app",
+      messagingSenderId: "210608658131",
+      appId: "1:210608658131:web:b503b82c100fa02f386626"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Expose Firebase functions globally for use in main script
+    window._fb = { db, ref, set, get, push, remove, onValue, off };
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -622,14 +644,29 @@
       </div>
 
       <div class="config-section">
-        <div class="config-section-title">Google Sheets</div>
+        <div class="config-section-title">Firebase</div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+            <span style="font-size:28px">🔥</span>
+            <div>
+              <div style="font-size:14px;font-weight:600">Firebase Realtime Database</div>
+              <div style="font-size:12px;color:var(--text-hint)" id="fbStatusText">Verificando conexão...</div>
+            </div>
+            <div id="fbStatusDot" class="status-dot dot-amber" style="margin-left:auto;flex-shrink:0"></div>
+          </div>
+          <p style="font-size:12px;color:var(--text-hint);margin-top:6px;line-height:1.6">Sincronização em tempo real ativa. Os dados são compartilhados instantaneamente entre os celulares.</p>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <div class="config-section-title">Google Sheets (Relatórios)</div>
         <div class="card">
           <div class="form-group">
-            <label class="form-label">URL do Apps Script (Web App)</label>
+            <label class="form-label">URL do Apps Script</label>
             <input type="url" class="text-input" id="scriptUrl" placeholder="https://script.google.com/macros/s/..." />
           </div>
-          <button class="btn-primary" onclick="saveConfig()">Salvar configuração</button>
-          <p style="font-size:12px;color:var(--text-hint);margin-top:10px;line-height:1.6">Veja o arquivo <strong>README.md</strong> para o passo a passo de como criar e publicar o script no Google Apps Script.</p>
+          <button class="btn-primary" onclick="saveConfig()">Salvar</button>
+          <p style="font-size:12px;color:var(--text-hint);margin-top:8px">Usado apenas para exportar relatórios ao Sheets.</p>
         </div>
       </div>
 
@@ -983,6 +1020,7 @@ function loadCategories() {
 function saveCategories() {
   localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
   localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
+  syncConfig();
 }
 function getAllCategories() { return [...CATEGORIES, ...customCategories]; }
 
@@ -1044,8 +1082,7 @@ function init() {
     config = JSON.parse(savedConfig);
     document.getElementById('scriptUrl').value = config.scriptUrl || '';
   }
-  // Start auto sync polling if already configured
-  setTimeout(() => startSyncPolling(), 2000);
+  // Firebase starts automatically when SDK loads
   const savedBudget = localStorage.getItem('fin_budget');
   if (savedBudget) {
     budget = parseFloat(savedBudget) || 0;
@@ -1521,6 +1558,7 @@ function saveBudget() {
   localStorage.setItem('fin_budget', val.toString());
   updateHeader();
   showToast(val > 0 ? `✅ Orçamento de ${fmtCurrency(val)} salvo!` : '✅ Orçamento desativado');
+  syncConfig();
 }
 
 // ── Sync ──
@@ -1701,17 +1739,26 @@ document.addEventListener('visibilitychange', () => {
 
 function updateSyncBadge(state) {
   const b = document.getElementById('syncBadge');
+  const dot = document.getElementById('fbStatusDot');
+  const txt = document.getElementById('fbStatusText');
   if (state === 'syncing') {
     b.className = 'sync-badge sync-pending';
     b.innerHTML = '<span class="spinner" style="border-color:rgba(186,117,23,0.4);border-top-color:#BA7517;width:10px;height:10px;margin-right:5px"></span> Sincronizando...';
+    if (dot) dot.className = 'status-dot dot-amber';
+    if (txt) txt.textContent = 'Sincronizando...';
   } else if (state === true) {
     b.className = 'sync-badge sync-ok';
-    b.innerHTML = '<span class="status-dot dot-green"></span> Sincronizado';
+    b.innerHTML = '<span class="status-dot dot-green"></span> Sincronizado<span class="sync-time" id="syncTime"></span>';
+    updateSyncTime();
+    if (dot) dot.className = 'status-dot dot-green';
+    if (txt) txt.textContent = 'Conectado — sincronização em tempo real ativa';
   } else {
     b.className = 'sync-badge sync-error';
-    b.innerHTML = '<span class="status-dot dot-red"></span> Sem conexão — toque para tentar';
+    b.innerHTML = '<span class="status-dot dot-red"></span> Sem conexão';
     b.onclick = () => syncNow(false);
     b.style.cursor = 'pointer';
+    if (dot) dot.className = 'status-dot dot-red';
+    if (txt) txt.textContent = 'Sem conexão com o Firebase';
   }
 }
 
@@ -1732,7 +1779,6 @@ function saveConfig() {
   config.scriptUrl = document.getElementById('scriptUrl').value.trim();
   localStorage.setItem('fin_config', JSON.stringify(config));
   showToast('✅ Configuração salva!');
-  startSyncPolling();
 }
 
 async function forceSyncAll() {
@@ -2079,6 +2125,7 @@ function loadRecurring() {
 }
 function saveRecurring() {
   localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses));
+  syncRecurring();
 }
 
 function checkAndLaunchRecurring() {
