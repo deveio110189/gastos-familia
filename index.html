@@ -8,6 +8,55 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Gastos Família" />
   <title>Gastos Família</title>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getDatabase, ref, set, get, push, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAV_wJwr42OhIHDc8LAg-XvjBiSQWvETSs",
+      authDomain: "gastos-familia-915e3.firebaseapp.com",
+      databaseURL: "https://gastos-familia-915e3-default-rtdb.firebaseio.com",
+      projectId: "gastos-familia-915e3",
+      storageBucket: "gastos-familia-915e3.firebasestorage.app",
+      messagingSenderId: "210608658131",
+      appId: "1:210608658131:web:b503b82c100fa02f386626"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Expose Firebase functions globally for use in main script
+    window._fb = { db, ref, set, get, push, remove, onValue, off };
+
+    // ── Start Firebase listeners ──
+    function startListeners() {
+      // Expenses listener
+      onValue(ref(db, 'expenses'), (snapshot) => {
+        const data = snapshot.val();
+        const remoteExpenses = data ? Object.values(data).filter(e => e && e.id) : [];
+        if (typeof window.onFirebaseExpenses === 'function') {
+          window.onFirebaseExpenses(remoteExpenses);
+        }
+        if (typeof window.updateSyncBadge === 'function') window.updateSyncBadge(true);
+      });
+
+      // Config listener
+      onValue(ref(db, 'config/app'), (snapshot) => {
+        const data = snapshot.val();
+        if (data && typeof window.onFirebaseConfig === 'function') window.onFirebaseConfig(data);
+      });
+
+      // Recurring listener
+      onValue(ref(db, 'config/recurring'), (snapshot) => {
+        const data = snapshot.val();
+        if (data && typeof window.onFirebaseRecurring === 'function') window.onFirebaseRecurring(data);
+      });
+    }
+
+    startListeners();
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -311,6 +360,97 @@
     .pwd-btn-cancel { padding: 13px; border-radius: var(--radius-sm); border: 2px solid var(--border-strong); background: transparent; color: var(--text); font-family: var(--font); font-size: 15px; font-weight: 600; cursor: pointer; }
     .pwd-btn-confirm { padding: 13px; border-radius: var(--radius-sm); border: none; background: var(--green-500); color: white; font-family: var(--font); font-size: 15px; font-weight: 600; cursor: pointer; }
     @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+
+    /* ── Recurring expenses ── */
+    .recur-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .recur-item:last-child { border-bottom: none; }
+    .recur-info { flex: 1; min-width: 0; }
+    .recur-name { font-size: 14px; font-weight: 600; }
+    .recur-meta { font-size: 12px; color: var(--text-hint); margin-top: 2px; }
+    .recur-amount { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--red-700); flex-shrink: 0; }
+    .recur-actions { display: flex; gap: 4px; }
+    .recur-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; background: var(--green-50); color: var(--green-900); }
+
+    /* ── Category history modal ── */
+    .cat-hist-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .cat-hist-item:last-child { border-bottom: none; }
+    .cat-hist-info { flex: 1; min-width: 0; }
+    .cat-hist-desc { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cat-hist-meta { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
+    .cat-hist-amount { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--red-700); }
+
+    /* ── Monthly chart ── */
+    .monthly-chart-wrap { overflow-x: auto; padding-bottom: 4px; }
+    .monthly-chart { display: flex; align-items: flex-end; gap: 8px; min-width: max-content; padding: 8px 0; }
+    .monthly-col { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 44px; }
+    .monthly-bar-wrap { width: 100%; display: flex; align-items: flex-end; height: 80px; }
+    .monthly-bar { width: 100%; border-radius: 6px 6px 0 0; background: var(--green-500); transition: height 0.4s ease; min-height: 4px; cursor: pointer; }
+    .monthly-bar.current { background: var(--green-700); }
+    .monthly-bar:active { opacity: 0.8; }
+    .monthly-val { font-size: 9px; font-family: var(--mono); color: var(--text-hint); text-align: center; white-space: nowrap; }
+    .monthly-label { font-size: 10px; font-weight: 600; color: var(--text-muted); }
+    .monthly-label.current { color: var(--green-700); }
+
+    /* ── Notification badge ── */
+    .notif-badge { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--red-500); }
+
+    /* ── Recurring duration selector ── */
+    .duration-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 4px; }
+    .duration-chip { padding: 8px 4px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--surface-raised); cursor: pointer; text-align: center; transition: all 0.15s; font-family: var(--font); }
+    .duration-chip.selected { border-color: var(--green-500); background: var(--green-50); }
+    .duration-chip:active { transform: scale(0.95); }
+    .duration-chip-num { font-size: 16px; font-weight: 700; color: var(--text); }
+    .duration-chip-label { font-size: 10px; color: var(--text-hint); font-weight: 500; }
+    .duration-chip.selected .duration-chip-num { color: var(--green-900); }
+    .duration-chip.selected .duration-chip-label { color: var(--green-700); }
+    .recur-progress { margin-top: 6px; }
+    .recur-progress-track { height: 4px; background: var(--gray-100); border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
+    .recur-progress-fill { height: 100%; border-radius: 2px; background: var(--green-500); }
+    .recur-progress-label { font-size: 10px; color: var(--text-hint); font-family: var(--mono); }
+
+    /* ── Compact view mode ── */
+    .expense-item.compact { padding: 7px 0; gap: 8px; }
+    .expense-item.compact .expense-cat-icon { width: 32px; height: 32px; font-size: 15px; border-radius: 8px; }
+    .expense-item.compact .expense-desc { font-size: 13px; }
+    .expense-item.compact .expense-meta { font-size: 10px; }
+    .expense-item.compact .expense-amount { font-size: 13px; }
+    .expense-item.compact .expense-action-btn { width: 24px; height: 24px; font-size: 11px; }
+    .view-toggle { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
+    .view-btn { padding: 5px 10px; border-radius: 20px; border: 1.5px solid var(--border-strong); background: var(--surface-raised); font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; font-family: var(--font); transition: all 0.15s; }
+    .view-btn.active { background: var(--green-500); border-color: var(--green-500); color: #fff; }
+
+    /* ── Installment selector ── */
+    .installment-wrap { display: flex; gap: 8px; align-items: center; }
+    .installment-toggle { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface-raised); cursor: pointer; transition: all 0.15s; }
+    .installment-toggle.active { border-color: var(--green-500); background: var(--green-50); }
+    .installment-toggle-label { font-size: 14px; font-weight: 500; color: var(--text-muted); }
+    .installment-toggle.active .installment-toggle-label { color: var(--green-900); }
+    .installment-fields { display: flex; gap: 8px; margin-top: 8px; }
+    .installment-fields .text-input { flex: 1; }
+    .installment-badge { font-size: 11px; background: var(--green-50); color: var(--green-900); padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+
+    /* ── Sync timestamp ── */
+    .sync-time { font-size: 10px; color: var(--text-hint); margin-left: 4px; }
+
+    /* ── Category comparison ── */
+    .cat-compare-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .cat-compare-row:last-child { border-bottom: none; }
+    .cat-compare-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+    .cat-compare-info { flex: 1; min-width: 0; }
+    .cat-compare-name { font-size: 13px; font-weight: 600; }
+    .cat-compare-amounts { font-size: 11px; color: var(--text-hint); }
+    .cat-compare-diff { font-size: 12px; font-weight: 700; flex-shrink: 0; display: flex; align-items: center; gap: 3px; }
+    .diff-up { color: var(--red-700); }
+    .diff-down { color: var(--green-700); }
+    .diff-same { color: var(--text-hint); }
+
+    /* ── Quick categories in add modal ── */
+    .quick-cats-wrap { margin-bottom: 8px; }
+    .quick-cats-label { font-size: 11px; font-weight: 600; color: var(--text-hint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .quick-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+    .quick-cat-btn { display: flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface-raised); cursor: pointer; font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text-muted); transition: all 0.15s; }
+    .quick-cat-btn.selected { border-color: var(--green-500); background: var(--green-50); color: var(--green-900); }
+    .quick-cat-btn:active { transform: scale(0.95); }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -383,10 +523,20 @@
   <div class="screens">
     <!-- Home -->
     <div class="screen active" id="screen-home">
-      <div id="syncBadge" class="sync-badge sync-ok"><span class="status-dot dot-green"></span> Sincronizado</div>
-      <div id="budgetAlertWrap"></div>
-      <div class="card-title">Lançamentos</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div id="syncBadge" class="sync-badge sync-ok"><span class="status-dot dot-green"></span> Sincronizado<span class="sync-time" id="syncTime"></span></div>
+        <button id="alertToggleBtn" onclick="toggleAlerts()" style="display:none;background:none;border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;color:var(--amber-700);background:var(--amber-50);border:1px solid var(--amber-200)"></button>
+      </div>
+      <div id="budgetAlertWrap" style="display:none"></div>
       <div id="expenseList"></div>
+    </div>
+
+    <!-- Recurring -->
+    <div class="screen" id="screen-recur">
+      <button class="add-cat-btn" onclick="openRecurModal()">
+        <span style="font-size:20px">+</span> Novo gasto fixo
+      </button>
+      <div id="recurList"></div>
     </div>
 
     <!-- Categories -->
@@ -407,6 +557,13 @@
       </div>
 
       <div class="card">
+        <div class="card-title">Evolução mensal</div>
+        <div class="monthly-chart-wrap">
+          <div class="monthly-chart" id="monthlyChart"></div>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Divisão por pessoa</div>
         <div class="pie-wrap">
           <canvas id="pieCanvas" width="110" height="110"></canvas>
@@ -417,6 +574,14 @@
       <div class="card">
         <div class="card-title">Por categoria</div>
         <div class="bar-chart" id="categoryChart"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Comparativo mês anterior</span>
+          <span style="font-size:10px;color:var(--text-hint);font-weight:500" id="compareMonthLabel"></span>
+        </div>
+        <div id="categoryCompare"></div>
       </div>
 
       <div class="card">
@@ -503,14 +668,29 @@
       </div>
 
       <div class="config-section">
-        <div class="config-section-title">Google Sheets</div>
+        <div class="config-section-title">Firebase</div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+            <span style="font-size:28px">🔥</span>
+            <div>
+              <div style="font-size:14px;font-weight:600">Firebase Realtime Database</div>
+              <div style="font-size:12px;color:var(--text-hint)" id="fbStatusText">Verificando conexão...</div>
+            </div>
+            <div id="fbStatusDot" class="status-dot dot-amber" style="margin-left:auto;flex-shrink:0"></div>
+          </div>
+          <p style="font-size:12px;color:var(--text-hint);margin-top:6px;line-height:1.6">Sincronização em tempo real ativa. Os dados são compartilhados instantaneamente entre os celulares.</p>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <div class="config-section-title">Google Sheets (Relatórios)</div>
         <div class="card">
           <div class="form-group">
-            <label class="form-label">URL do Apps Script (Web App)</label>
+            <label class="form-label">URL do Apps Script</label>
             <input type="url" class="text-input" id="scriptUrl" placeholder="https://script.google.com/macros/s/..." />
           </div>
-          <button class="btn-primary" onclick="saveConfig()">Salvar configuração</button>
-          <p style="font-size:12px;color:var(--text-hint);margin-top:10px;line-height:1.6">Veja o arquivo <strong>README.md</strong> para o passo a passo de como criar e publicar o script no Google Apps Script.</p>
+          <button class="btn-primary" onclick="saveConfig()">Salvar</button>
+          <p style="font-size:12px;color:var(--text-hint);margin-top:8px">Usado apenas para exportar relatórios ao Sheets.</p>
         </div>
       </div>
 
@@ -553,6 +733,10 @@
     <button class="nav-btn" onclick="showScreen('cats')" id="nav-cats">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span>Categorias</span>
+    </button>
+    <button class="nav-btn" onclick="showScreen('recur')" id="nav-recur" style="position:relative">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 1l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 11V9a4 4 0 014-4h14" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 23l-4-4 4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 13v2a4 4 0 01-4 4H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Fixos</span>
     </button>
     <button class="nav-btn" onclick="showScreen('stats')" id="nav-stats">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="12" width="4" height="9" rx="1" stroke-linecap="round" stroke-linejoin="round"/><rect x="10" y="7" width="4" height="14" rx="1" stroke-linecap="round" stroke-linejoin="round"/><rect x="17" y="3" width="4" height="18" rx="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -635,6 +819,101 @@
     </div>
   </div>
 
+  <!-- Add/Edit Recurring Modal -->
+  <div class="modal-overlay" id="recurModal" onclick="handleRecurModalClick(event)">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="recurModalTitle">Novo gasto fixo</div>
+
+      <div class="form-group">
+        <label class="form-label">Quem é o responsável?</label>
+        <div class="person-picker">
+          <button class="person-btn selected" onclick="selectRecurPerson('Welinton')" id="recurBtnW">
+            <div class="person-btn-avatar avatar-w">W</div>
+            <div class="person-btn-name">Welinton</div>
+          </button>
+          <button class="person-btn" onclick="selectRecurPerson('Débora')" id="recurBtnD">
+            <div class="person-btn-avatar avatar-d">D</div>
+            <div class="person-btn-name">Débora</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Descrição</label>
+        <input type="text" class="text-input" id="recurDescInput" placeholder="Ex: Aluguel, Netflix, Academia..." maxlength="60" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Valor</label>
+        <div class="amount-input-wrap">
+          <span class="currency-prefix">R$</span>
+          <input type="text" class="amount-input" id="recurAmountInput" placeholder="0,00" inputmode="numeric" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <div class="cat-grid" id="recurCatGrid"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Dia do vencimento</label>
+        <input type="number" class="text-input" id="recurDayInput" placeholder="Ex: 5" min="1" max="31" inputmode="numeric" />
+        <p style="font-size:12px;color:var(--text-hint);margin-top:6px">O gasto será lançado automaticamente todo mês neste dia</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Por quantos meses?</label>
+        <div class="duration-grid">
+          <div class="duration-chip selected" id="dur-0" onclick="selectDuration(0)">
+            <div class="duration-chip-num">∞</div>
+            <div class="duration-chip-label">Sempre</div>
+          </div>
+          <div class="duration-chip" id="dur-3" onclick="selectDuration(3)">
+            <div class="duration-chip-num">3</div>
+            <div class="duration-chip-label">meses</div>
+          </div>
+          <div class="duration-chip" id="dur-6" onclick="selectDuration(6)">
+            <div class="duration-chip-num">6</div>
+            <div class="duration-chip-label">meses</div>
+          </div>
+          <div class="duration-chip" id="dur-12" onclick="selectDuration(12)">
+            <div class="duration-chip-num">12</div>
+            <div class="duration-chip-label">meses</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <span style="font-size:12px;color:var(--text-muted);font-weight:500">Outro:</span>
+          <input type="number" class="text-input" id="recurDurationCustom" placeholder="Ex: 18" min="1" max="360" inputmode="numeric" style="flex:1" oninput="selectDuration('custom')" />
+          <span style="font-size:12px;color:var(--text-muted)">meses</span>
+        </div>
+        <p id="recurDurationHint" style="font-size:12px;color:var(--text-hint);margin-top:6px">♾️ Sem data de término — cancele quando quiser</p>
+      </div>
+
+      <button class="btn-primary" id="recurSubmitBtn" onclick="submitRecur()">Salvar gasto fixo</button>
+    </div>
+  </div>
+
+  <!-- Category History Modal -->
+  <div class="modal-overlay" id="catHistModal" onclick="handleCatHistModalClick(event)">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div style="font-size:28px" id="catHistIcon">📋</div>
+        <div>
+          <div style="font-size:18px;font-weight:700" id="catHistTitle">Categoria</div>
+          <div style="font-size:13px;color:var(--text-hint)" id="catHistPeriod"></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value red" id="catHistTotal">R$ 0</div></div>
+        <div class="stat-card"><div class="stat-label">Lançamentos</div><div class="stat-value blue" id="catHistCount">0</div></div>
+      </div>
+      <div id="catHistList"></div>
+    </div>
+  </div>
+
   <!-- Exit Modal -->
   <div class="exit-modal-overlay" id="exitModal">
     <div class="exit-modal-box">
@@ -698,6 +977,10 @@
 
       <div class="form-group">
         <label class="form-label">Categoria</label>
+        <div class="quick-cats-wrap" id="quickCatsWrap">
+          <div class="quick-cats-label">⚡ Mais usadas este mês</div>
+          <div class="quick-cats" id="quickCats"></div>
+        </div>
         <div class="cat-grid" id="catGrid"></div>
       </div>
 
@@ -709,6 +992,28 @@
       <div class="form-group">
         <label class="form-label">Data</label>
         <input type="date" class="text-input" id="dateInput" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Parcelado?</label>
+        <div class="installment-toggle" id="installmentToggle" onclick="toggleInstallment()">
+          <span style="font-size:18px">💳</span>
+          <span class="installment-toggle-label">Dividir em parcelas</span>
+          <span id="installmentBadge" style="display:none" class="installment-badge"></span>
+        </div>
+        <div id="installmentFields" style="display:none">
+          <div class="installment-fields" style="margin-top:8px">
+            <div style="flex:1">
+              <label style="font-size:11px;color:var(--text-hint);font-weight:600;display:block;margin-bottom:4px">Nº DE PARCELAS</label>
+              <input type="number" class="text-input" id="installmentCount" placeholder="Ex: 12" min="2" max="60" inputmode="numeric" oninput="updateInstallmentPreview()" />
+            </div>
+            <div style="flex:1">
+              <label style="font-size:11px;color:var(--text-hint);font-weight:600;display:block;margin-bottom:4px">VALOR TOTAL</label>
+              <input type="text" class="text-input" id="installmentTotal" placeholder="0,00" inputmode="numeric" oninput="updateInstallmentPreview()" />
+            </div>
+          </div>
+          <div id="installmentPreview" style="font-size:12px;color:var(--green-700);font-weight:600;margin-top:6px;padding:8px;background:var(--green-50);border-radius:8px;display:none"></div>
+        </div>
       </div>
 
       <button class="btn-primary" id="submitBtn" onclick="submitExpense()">Adicionar gasto</button>
@@ -739,8 +1044,42 @@ function loadCategories() {
 function saveCategories() {
   localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
   localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
+  syncConfig();
 }
 function getAllCategories() { return [...CATEGORIES, ...customCategories]; }
+
+// ── Helper: normalize string for comparison ──
+function normStr(s) {
+  if (!s) return '';
+  return String(s).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+// ── Helper: get icon by label ──
+function getCatIconByLabel(label) {
+  const cat = getAllCategories().find(c =>
+    c.label === label ||
+    normStr(c.label) === normStr(label)
+  );
+  return cat ? cat.icon : '📋';
+}
+
+// ── Fix imported expenses: normalize category field ──
+function normalizeExpenseCategory(expense) {
+  if (!expense.category || expense.category === 'undefined') {
+    // Try to find category by label
+    const cat = getAllCategories().find(c =>
+      c.label === expense.categoryLabel ||
+      normStr(c.label) === normStr(expense.categoryLabel)
+    );
+    expense.category = cat ? cat.id : normStr(expense.categoryLabel || 'outros');
+  }
+  if (!expense.categoryIcon || expense.categoryIcon === 'undefined' || expense.categoryIcon === '') {
+    expense.categoryIcon = getCatIconByLabel(expense.categoryLabel || '');
+  }
+  return expense;
+}
 
 const CATEGORIES = [
   { id: 'alimentacao', label: 'Alimentação', icon: '🍽️' },
@@ -773,6 +1112,9 @@ let currentMonthOffset = 0; // 0 = current month, -1 = last month, etc.
 function init() {
   setTimeout(() => document.getElementById('splash').classList.add('hide'), 1800);
   loadCategories();
+  loadRecurring();
+  setTimeout(checkAndLaunchRecurring, 1500);
+
   loadFromStorage();
   renderCategoryGrid();
   setDefaultDate();
@@ -797,6 +1139,7 @@ function init() {
     config = JSON.parse(savedConfig);
     document.getElementById('scriptUrl').value = config.scriptUrl || '';
   }
+  // Firebase starts automatically when SDK loads
   const savedBudget = localStorage.getItem('fin_budget');
   if (savedBudget) {
     budget = parseFloat(savedBudget) || 0;
@@ -806,7 +1149,11 @@ function init() {
 
 function loadFromStorage() {
   const raw = localStorage.getItem('fin_expenses');
-  if (raw) expenses = JSON.parse(raw);
+  if (raw) {
+    expenses = JSON.parse(raw);
+    // Normalize imported expenses
+    expenses = expenses.map(e => normalizeExpenseCategory(e));
+  }
 }
 function saveToStorage() { localStorage.setItem('fin_expenses', JSON.stringify(expenses)); }
 
@@ -817,7 +1164,7 @@ function changeMonth(dir) {
   updateMonthLabel();
   updateHeader();
   renderExpenses();
-  if (document.getElementById('screen-stats').classList.contains('active')) renderStats();
+  if (document.getElementById('screen-stats').classList.contains('active')) { renderStats(); renderMonthlyChart(); }
 }
 
 function getViewMonth() {
@@ -867,8 +1214,9 @@ function showScreen(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`screen-${name}`).classList.add('active');
   document.getElementById(`nav-${name}`).classList.add('active');
-  if (name === 'stats') renderStats();
+  if (name === 'stats') { renderStats(); renderMonthlyChart(); }
   if (name === 'cats') renderCatScreen();
+  if (name === 'recur') renderRecurList();
 }
 
 // ── Person filter ──
@@ -932,9 +1280,21 @@ function openAddModal(editId = null) {
     selectPerson('Welinton');
   }
 
+  // Reset installment
+  installmentActive = false;
+  document.getElementById('installmentToggle').classList.remove('active');
+  document.getElementById('installmentFields').style.display = 'none';
+  document.getElementById('installmentBadge').style.display = 'none';
+  document.getElementById('installmentPreview').style.display = 'none';
+  document.getElementById('installmentCount').value = '';
+  document.getElementById('installmentTotal').value = '';
+
   document.getElementById('addModal').classList.add('open');
   history.pushState({ modal: 'add' }, '', '');
-  setTimeout(() => document.getElementById('amountInput').focus(), 350);
+  setTimeout(() => {
+    renderQuickCats();
+    document.getElementById('amountInput').focus();
+  }, 350);
 }
 
 function closeModal() { document.getElementById('addModal').classList.remove('open'); }
@@ -978,7 +1338,7 @@ async function submitExpense() {
     // Edit existing
     const idx = expenses.findIndex(e => e.id === editingId);
     if (idx !== -1) {
-      expenses[idx] = { ...expenses[idx], person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, synced: false };
+      expenses[idx] = { ...expenses[idx], person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, synced: false, updatedAt: new Date().toISOString() };
     }
     saveToStorage();
     closeModal();
@@ -989,6 +1349,40 @@ async function submitExpense() {
     showToast('✏️ Gasto atualizado!');
     syncExpense(expenses.find(e => e.id === editingId), 'updateExpense');
   } else {
+    if (installmentActive) {
+      const count = parseInt(document.getElementById('installmentCount').value) || 0;
+      const rawTotal = document.getElementById('installmentTotal').value.replace(/\./g,'').replace(',','.');
+      const total = parseFloat(rawTotal) || 0;
+      if (count >= 2 && total > 0) {
+        const perMonth = total / count;
+        const baseId = Date.now().toString(36);
+        const baseDate = new Date(date + 'T12:00:00');
+        for (let i = 0; i < count; i++) {
+          const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, baseDate.getDate());
+          const iDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          const installment = {
+            id: baseId + '_p' + (i+1),
+            person: selectedPerson, amount: perMonth,
+            category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
+            description: `${desc||cat.label} (${i+1}/${count})`,
+            date: iDate, createdAt: new Date().toISOString(), synced: false,
+            isInstallment: true, installmentNum: i+1, installmentTotal: count
+          };
+          expenses.unshift(installment);
+          syncExpense(installment);
+        }
+        expenses.sort((a,b) => b.date.localeCompare(a.date));
+        saveToStorage();
+        closeModal();
+        updateHeader();
+        renderExpenses();
+        renderStats();
+        vibrate(40);
+        showToast(`💳 ${count} parcelas de ${fmtCurrency(perMonth)} lançadas!`);
+        return;
+      }
+    }
+
     const expense = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, createdAt: new Date().toISOString(), synced: false };
     expenses.unshift(expense);
     saveToStorage();
@@ -1103,7 +1497,12 @@ function updateHeader() {
   const monthExpCA = expenses.filter(e => e.date.startsWith(prefixCA));
   getAllCategories().forEach(cat => {
     const cb = categoryBudgets[cat.id]; if (!cb) return;
-    const cs = monthExpCA.filter(e=>e.category===cat.id).reduce((s,e)=>s+e.amount,0);
+    const cs = monthExpCA.filter(e => {
+      return e.category === cat.id ||
+             e.categoryLabel === cat.label ||
+             (e.category || '').toLowerCase() === cat.id.toLowerCase() ||
+             normStr(e.categoryLabel) === normStr(cat.label);
+    }).reduce((s,e)=>s+e.amount,0);
     const cp = (cs/cb)*100;
     if (cp>=100) catAlerts.push(`🚨 <strong>${cat.icon} ${cat.label}</strong>: estourado! (${fmtCurrency(cs)} / ${fmtCurrency(cb)})`);
     else if (cp>=80) catAlerts.push(`⚠️ <strong>${cat.icon} ${cat.label}</strong>: ${cp.toFixed(0)}% usado`);
@@ -1112,6 +1511,8 @@ function updateHeader() {
   // Budget bar
   const wrap = document.getElementById('budgetBarWrap');
   const alertWrap = document.getElementById('budgetAlertWrap');
+  const allAlerts = [];
+
   if (budget > 0) {
     const pct = Math.min((total / budget) * 100, 100);
     const fill = document.getElementById('budgetBarFill');
@@ -1119,22 +1520,51 @@ function updateHeader() {
     fill.className = 'budget-bar-fill' + (pct >= 100 ? ' over' : pct >= 80 ? ' warn' : '');
     document.getElementById('budgetInfo').textContent = `${fmtCurrency(total)} de ${fmtCurrency(budget)} (${pct.toFixed(0)}%)`;
     wrap.style.display = 'block';
-
-    // Alert
-    if (pct >= 100) {
-      alertWrap.innerHTML = `<div class="budget-alert over">🚨 Orçamento estourado! Você gastou ${fmtCurrency(total - budget)} a mais.</div>`;
-    } else if (pct >= 80) {
-      alertWrap.innerHTML = `<div class="budget-alert warn">⚠️ Atenção! Você já usou ${pct.toFixed(0)}% do orçamento mensal.</div>`;
-    } else {
-      alertWrap.innerHTML = '';
-    }
+    if (pct >= 100) allAlerts.push(`<div class="budget-alert over">🚨 Orçamento geral estourado! Você gastou ${fmtCurrency(total - budget)} a mais.</div>`);
+    else if (pct >= 80) allAlerts.push(`<div class="budget-alert warn">⚠️ Você já usou ${pct.toFixed(0)}% do orçamento geral.</div>`);
   } else {
     wrap.style.display = 'none';
-    alertWrap.innerHTML = catAlerts.map(a=>`<div class="budget-alert warn">${a}</div>`).join('');
   }
-  if (budget > 0 && catAlerts.length) {
-    alertWrap.innerHTML += catAlerts.map(a=>`<div class="budget-alert warn" style="margin-top:4px">${a}</div>`).join('');
+
+  catAlerts.forEach(a => allAlerts.push(`<div class="budget-alert warn">${a}</div>`));
+  updateAlertButton(allAlerts);
+}
+
+// ── Alert toggle ──
+let alertsVisible = false;
+
+function updateAlertButton(allAlerts) {
+  const btn = document.getElementById('alertToggleBtn');
+  const alertWrapEl = document.getElementById('budgetAlertWrap');
+  if (!btn || !alertWrapEl) return;
+
+  if (!allAlerts.length) {
+    btn.style.display = 'none';
+    alertWrapEl.style.display = 'none';
+    alertWrapEl.innerHTML = '';
+    return;
   }
+
+  const critical = allAlerts.filter(a => a.includes('over') || a.includes('🚨')).length;
+  const icon = critical > 0 ? '🚨' : '⚠️';
+  const color = critical > 0 ? 'var(--red-700)' : 'var(--amber-700)';
+  const bg = critical > 0 ? 'var(--red-50)' : 'var(--amber-50)';
+  const borderColor = critical > 0 ? 'var(--red-200)' : 'var(--amber-200)';
+
+  btn.style.display = 'inline-flex';
+  btn.style.color = color;
+  btn.style.background = bg;
+  btn.style.borderColor = borderColor;
+  btn.innerHTML = `${icon} ${allAlerts.length} alerta${allAlerts.length > 1 ? 's' : ''} ${alertsVisible ? '▲' : '▼'}`;
+  alertWrapEl.innerHTML = allAlerts.join('');
+  alertWrapEl.style.display = alertsVisible ? 'block' : 'none';
+}
+
+function toggleAlerts() {
+  alertsVisible = !alertsVisible;
+  const alertWrapEl = document.getElementById('budgetAlertWrap');
+  if (alertWrapEl) alertWrapEl.style.display = alertsVisible ? 'block' : 'none';
+  updateHeader();
 }
 
 // ── Stats ──
@@ -1152,6 +1582,9 @@ function renderStats() {
 
   // Pie chart
   renderPie(wTotal, dTotal);
+
+  // Category comparison
+  renderCategoryComparison();
 
   // Bar chart
   const cats = {};
@@ -1222,16 +1655,26 @@ function saveBudget() {
   localStorage.setItem('fin_budget', val.toString());
   updateHeader();
   showToast(val > 0 ? `✅ Orçamento de ${fmtCurrency(val)} salvo!` : '✅ Orçamento desativado');
+  syncConfig();
 }
 
 // ── Sync ──
+// ════════════════════════════════════════════
+// SYNC ENGINE — bidirectional real-time
+// ════════════════════════════════════════════
+let syncPollingTimer = null;
+const SYNC_INTERVAL = 60000; // 60 seconds
+
+// ── Send one expense to Sheets ──
 async function syncExpense(expense, action) {
   if (!config.scriptUrl || !expense) return;
   action = action || 'addExpense';
   updateSyncBadge('syncing');
   try {
+    // Use no-cors for POST (Apps Script limitation)
     await fetch(config.scriptUrl, {
-      method: 'POST', mode: 'no-cors',
+      method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, expense })
     });
@@ -1246,70 +1689,173 @@ async function syncExpense(expense, action) {
   }
 }
 
+// ── Delete from Sheets ──
 async function syncDelete(expenseId) {
   if (!config.scriptUrl) return;
-  updateSyncBadge('syncing');
   try {
     await fetch(config.scriptUrl, {
-      method: 'POST', mode: 'no-cors',
+      method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'deleteExpense', expenseId })
     });
-    updateSyncBadge(true);
-  } catch(e) { updateSyncBadge(false); }
+  } catch(e) { console.log('Delete sync failed:', e); }
 }
 
-async function syncNow() {
-  const unsynced = expenses.filter(e => !e.synced);
-  if (!unsynced.length) { showToast('✅ Tudo já sincronizado!'); return; }
-  showToast(`⏳ Sincronizando ${unsynced.length} lançamento(s)...`);
-  for (const e of unsynced) await syncExpense(e, 'addExpense');
-  const stillUnsynced = expenses.filter(e => !e.synced).length;
-  showToast(stillUnsynced === 0 ? '✅ Sincronização concluída!' : `⚠️ ${stillUnsynced} lançamento(s) falharam`);
-  renderExpenses();
-}
-
-// ── Fetch from Sheets (bidirectional sync) ──
-async function fetchFromSheets() {
-  if (!config.scriptUrl) { showToast('⚠️ Configure o Apps Script primeiro'); return; }
-  showToast('⏳ Buscando dados do Sheets...');
+// ── Pull data from Sheets via GET ──
+async function fetchFromSheets(silent) {
+  if (!config.scriptUrl) {
+    if (!silent) showToast('⚠️ Configure o Apps Script primeiro');
+    return;
+  }
+  updateSyncBadge('syncing');
   try {
-    const url = config.scriptUrl.replace('/exec', '/exec') + '?action=getExpenses';
+    const url = config.scriptUrl + '?action=getExpenses&t=' + Date.now();
     const res = await fetch(url);
-    const data = await res.json();
-    if (data.expenses && Array.isArray(data.expenses)) {
-      let added = 0;
-      const existingIds = new Set(expenses.map(e => e.id));
-      data.expenses.forEach(e => {
-        if (!existingIds.has(e.id)) { expenses.push({ ...e, synced: true }); added++; }
-      });
-      if (added > 0) {
-        expenses.sort((a,b) => b.date.localeCompare(a.date));
-        saveToStorage();
-        updateHeader();
-        renderExpenses();
-        renderStats();
-        showToast(`✅ ${added} novo(s) lançamento(s) recebido(s)!`);
-      } else {
-        showToast('✅ Tudo já atualizado!');
-      }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(pe) { throw new Error('Resposta inválida: ' + text.substring(0, 100)); }
+
+    if (!data.expenses || !Array.isArray(data.expenses)) {
+      updateSyncBadge(true);
+      return;
     }
-  } catch(e) { showToast('❌ Falha ao buscar dados'); }
+
+    const localIds = new Set(expenses.map(e => e.id));
+    const deletedIds = new Set(data.deletedIds || []);
+    let added = 0, updated = 0, removed = 0;
+
+    data.expenses.forEach(function(remote) {
+      if (!remote.id) return;
+      if (deletedIds.has(remote.id)) return;
+
+      // Normalize date — handle any format
+      var rawDate = String(remote.date || '');
+      if (rawDate && !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+        var parsed = new Date(rawDate);
+        if (!isNaN(parsed.getTime())) {
+          var yy = parsed.getFullYear();
+          var mm = String(parsed.getMonth()+1).padStart(2,'0');
+          var dd = String(parsed.getDate()).padStart(2,'0');
+          remote.date = yy+'-'+mm+'-'+dd;
+        }
+      }
+
+      // Fix icon
+      if (!remote.categoryIcon || remote.categoryIcon === '' || remote.categoryIcon === 'undefined') {
+        var catMatch = getAllCategories().find(function(c){ return c.label === remote.categoryLabel; });
+        remote.categoryIcon = catMatch ? catMatch.icon : '📋';
+      }
+
+      remote.synced = true;
+
+      if (!localIds.has(remote.id)) {
+        expenses.push(remote);
+        added++;
+      } else {
+        var local = expenses.find(function(x){ return x.id === remote.id; });
+        if (local) {
+          var remoteTime = remote.updatedAt || remote.createdAt || '';
+          var localTime  = local.updatedAt  || local.createdAt  || '';
+          if (remoteTime > localTime) {
+            var idx = expenses.findIndex(function(x){ return x.id === remote.id; });
+            expenses[idx] = remote;
+            updated++;
+          }
+        }
+      }
+    });
+
+    deletedIds.forEach(function(id) {
+      var idx = expenses.findIndex(function(e){ return e.id === id; });
+      if (idx !== -1) { expenses.splice(idx, 1); removed++; }
+    });
+
+    expenses.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    saveToStorage();
+    updateHeader();
+    renderExpenses();
+    if (document.getElementById('screen-stats').classList.contains('active')) renderStats();
+    localStorage.setItem('fin_last_sync', new Date().toISOString());
+    updateSyncTime();
+    updateSyncBadge(true);
+
+    if (added > 0 || updated > 0 || removed > 0) {
+      var msgs = [];
+      if (added > 0) msgs.push(added + ' novo(s)');
+      if (updated > 0) msgs.push(updated + ' atualizado(s)');
+      if (removed > 0) msgs.push(removed + ' removido(s)');
+      showToast('🔄 ' + msgs.join(', '));
+    } else if (!silent) {
+      showToast('✅ Tudo já atualizado!');
+    }
+
+    // Config sync removed - categories managed locally
+
+  } catch(e) {
+    console.log('fetchFromSheets error:', e);
+    updateSyncBadge(false);
+    if (!silent) showToast('❌ Erro: ' + e.message);
+  }
 }
+
+// ── Push unsynced + pull updates ──
+async function syncNow(silent) {
+  if (!config.scriptUrl) {
+    if (!silent) showToast('⚠️ Configure o Apps Script primeiro');
+    return;
+  }
+  const unsynced = expenses.filter(e => !e.synced);
+  if (unsynced.length) {
+    if (!silent) showToast(`⏳ Enviando ${unsynced.length} lançamento(s)...`);
+    for (const e of unsynced) await syncExpense(e, 'addExpense');
+  }
+  await fetchFromSheets(silent);
+}
+
+// ── Auto polling every 60s ──
+function startSyncPolling() {
+  if (syncPollingTimer) clearInterval(syncPollingTimer);
+  if (!config.scriptUrl) return;
+  // Fetch immediately on start
+  fetchFromSheets(true);
+  // Then every 60s
+  syncPollingTimer = setInterval(() => {
+    if (document.visibilityState !== 'hidden') fetchFromSheets(true);
+  }, SYNC_INTERVAL);
+}
+
+// Sync when app comes back from background
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && config.scriptUrl) {
+    fetchFromSheets(true);
+  }
+});
 
 function updateSyncBadge(state) {
   const b = document.getElementById('syncBadge');
+  const dot = document.getElementById('fbStatusDot');
+  const txt = document.getElementById('fbStatusText');
   if (state === 'syncing') {
     b.className = 'sync-badge sync-pending';
     b.innerHTML = '<span class="spinner" style="border-color:rgba(186,117,23,0.4);border-top-color:#BA7517;width:10px;height:10px;margin-right:5px"></span> Sincronizando...';
+    if (dot) dot.className = 'status-dot dot-amber';
+    if (txt) txt.textContent = 'Sincronizando...';
   } else if (state === true) {
     b.className = 'sync-badge sync-ok';
-    b.innerHTML = '<span class="status-dot dot-green"></span> Sincronizado';
+    b.innerHTML = '<span class="status-dot dot-green"></span> Sincronizado<span class="sync-time" id="syncTime"></span>';
+    updateSyncTime();
+    if (dot) dot.className = 'status-dot dot-green';
+    if (txt) txt.textContent = 'Conectado — sincronização em tempo real ativa';
   } else {
     b.className = 'sync-badge sync-error';
-    b.innerHTML = '<span class="status-dot dot-red"></span> Sem conexão — toque para tentar';
-    b.onclick = () => syncNow();
+    b.innerHTML = '<span class="status-dot dot-red"></span> Sem conexão';
+    b.onclick = () => syncNow(false);
     b.style.cursor = 'pointer';
+    if (dot) dot.className = 'status-dot dot-red';
+    if (txt) txt.textContent = 'Sem conexão com o Firebase';
   }
 }
 
@@ -1330,6 +1876,18 @@ function saveConfig() {
   config.scriptUrl = document.getElementById('scriptUrl').value.trim();
   localStorage.setItem('fin_config', JSON.stringify(config));
   showToast('✅ Configuração salva!');
+}
+
+async function forceSyncAll() {
+  if (!fbReady) { showToast('⚠️ Firebase não conectado'); return; }
+  showToast('⏳ Enviando tudo ao Firebase...');
+  updateSyncBadge('syncing');
+  const unsynced = expenses.filter(e => !e.synced);
+  for (const e of unsynced) await syncExpense(e, 'addExpense');
+  await syncConfig();
+  await syncRecurring();
+  showToast('✅ Tudo enviado ao Firebase!');
+  updateSyncBadge(true);
 }
 
 function clearData() {
@@ -1375,7 +1933,13 @@ function renderCatScreen() {
   const monthExp = expenses.filter(e => e.date.startsWith(prefix));
   const allCats = getAllCategories();
   document.getElementById('catScreenGrid').innerHTML = allCats.map(cat => {
-    const spent = monthExp.filter(e => e.category === cat.id).reduce((s,e) => s+e.amount, 0);
+    const spent = monthExp.filter(e => {
+      // Match by id OR by label (for expenses imported from Sheets)
+      return e.category === cat.id ||
+             e.categoryLabel === cat.label ||
+             (e.category || '').toLowerCase() === cat.id.toLowerCase() ||
+             normStr(e.categoryLabel) === normStr(cat.label);
+    }).reduce((s,e) => s+e.amount, 0);
     const bgt = categoryBudgets[cat.id] || 0;
     const isDefault = DEFAULT_CAT_IDS.includes(cat.id);
     const pct = bgt > 0 ? Math.min((spent/bgt)*100, 100) : 0;
@@ -1384,13 +1948,14 @@ function renderCatScreen() {
     const budgetLabel = bgt > 0 ? `de ${fmtCurrency(bgt)}` : '';
     return `<div class="cat-card">
       <div class="cat-card-header">
-        <div class="cat-card-icon">${cat.icon}</div>
-        <div style="flex:1;min-width:0">
+        <div class="cat-card-icon" onclick="openCatHistory('${cat.id}')" style="cursor:pointer">${cat.icon}</div>
+        <div style="flex:1;min-width:0" onclick="openCatHistory('${cat.id}')" style="cursor:pointer">
           <div class="cat-card-name">${cat.label}</div>
           <div class="cat-card-meta">${spentLabel}${budgetLabel ? ` ${budgetLabel}` : ' este mês'}</div>
         </div>
         <div class="cat-card-actions">
-          <button class="cat-card-btn" onclick="openCatBudgetModal('${cat.id}')">💰 Orçamento</button>
+          <button class="cat-card-btn" onclick="openCatHistory('${cat.id}')">📋</button>
+          <button class="cat-card-btn" onclick="openCatBudgetModal('${cat.id}')">💰</button>
           <button class="cat-card-btn" onclick="openCatModal('${cat.id}')">✏️</button>
           ${!isDefault ? `<button class="cat-card-btn del-btn" onclick="openDelCatModal('${cat.id}')">🗑️</button>` : ''}
         </div>
@@ -1613,6 +2178,670 @@ function checkPassword() {
   }
 }
 
+// ════════════════════════════════════════════════
+// RECURRING EXPENSES
+// ════════════════════════════════════════════════
+let recurringExpenses = [];
+let editingRecurId = null;
+let selectedRecurPerson = 'Welinton';
+let selectedRecurCategory = null;
+let selectedDuration = 0; // 0 = indeterminate
+
+function selectDuration(val) {
+  selectedDuration = val === 'custom' ? 'custom' : parseInt(val);
+  [0, 3, 6, 12].forEach(v => {
+    const el = document.getElementById(`dur-${v}`);
+    if (el) el.classList.toggle('selected', v === selectedDuration);
+  });
+  const hint = document.getElementById('recurDurationHint');
+  if (val === 0) {
+    hint.textContent = '♾️ Sem data de término — cancele quando quiser';
+    document.getElementById('recurDurationCustom').value = '';
+  } else if (val === 'custom') {
+    const custom = parseInt(document.getElementById('recurDurationCustom').value) || 0;
+    hint.textContent = custom > 0 ? `📅 Será lançado por ${custom} meses` : '📅 Digite a quantidade de meses';
+    [0,3,6,12].forEach(v => { const el = document.getElementById(`dur-${v}`); if(el) el.classList.remove('selected'); });
+  } else {
+    hint.textContent = `📅 Será lançado por ${val} meses e depois cancelado automaticamente`;
+    document.getElementById('recurDurationCustom').value = '';
+  }
+}
+
+function loadRecurring() {
+  const r = localStorage.getItem('fin_recurring');
+  if (r) recurringExpenses = JSON.parse(r);
+}
+function saveRecurring() {
+  localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses));
+  syncRecurring();
+}
+
+function checkAndLaunchRecurring() {
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const currentMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+  let changed = false;
+
+  recurringExpenses.forEach(recur => {
+    // Check if expired (endMonth defined and already passed)
+    if (recur.endMonth && currentMonth > recur.endMonth) {
+      return; // skip silently — auto-expired
+    }
+
+    // Check if already launched this month
+    const alreadyLaunched = expenses.some(e =>
+      e.recurringId === recur.id && e.date.startsWith(currentMonth)
+    );
+    if (alreadyLaunched) return;
+
+    // Check if today is on or past the due day this month
+    const dueDay = parseInt(recur.day);
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+    const actualDay = Math.min(dueDay, daysInMonth);
+    const dueDate = `${currentMonth}-${String(actualDay).padStart(2,'0')}`;
+
+    if (todayStr >= dueDate) {
+      const expense = {
+        id: 'recur_' + recur.id + '_' + currentMonth,
+        recurringId: recur.id,
+        person: recur.person,
+        amount: recur.amount,
+        category: recur.category,
+        categoryLabel: recur.categoryLabel,
+        categoryIcon: recur.categoryIcon,
+        description: recur.description + ' (fixo)',
+        date: dueDate,
+        createdAt: new Date().toISOString(),
+        synced: false,
+        isRecurring: true
+      };
+      expenses.unshift(expense);
+      recur.launchedCount = (recur.launchedCount || 0) + 1;
+      changed = true;
+      saveToStorage();
+      syncExpense(expense, 'addExpense');
+
+      // Progress label
+      const progLabel = recur.totalMonths > 0
+        ? ` (${recur.launchedCount}/${recur.totalMonths})`
+        : '';
+      showToast(`🔄 ${recur.categoryIcon} "${recur.description}"${progLabel} lançado!`);
+    }
+  });
+
+  if (changed) saveRecurring();
+  localStorage.setItem('fin_recur_lastcheck', todayStr);
+  updateHeader();
+  renderExpenses();
+}
+
+function renderRecurList() {
+  const list = document.getElementById('recurList');
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  if (!recurringExpenses.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔄</div><div class="empty-title">Nenhum gasto fixo</div><div class="empty-desc">Adicione gastos que se repetem todo mês como aluguel, internet, assinaturas...</div></div>`;
+    return;
+  }
+  list.innerHTML = recurringExpenses.map(r => `
+    <div class="recur-item">
+      <div class="expense-cat-icon">${r.categoryIcon}</div>
+      <div class="recur-info">
+        <div class="recur-name">${r.description}</div>
+        <div class="recur-meta">
+          <span class="expense-person-badge ${r.person==='Welinton'?'badge-w':'badge-d'}">${r.person}</span>
+          <span>${r.categoryLabel} · dia ${r.day}</span>
+        </div>
+        ${r.totalMonths > 0 ? `
+        <div class="recur-progress">
+          <div class="recur-progress-track">
+            <div class="recur-progress-fill" style="width:${Math.min(((r.launchedCount||0)/r.totalMonths)*100,100).toFixed(0)}%"></div>
+          </div>
+          <div class="recur-progress-label">${r.launchedCount||0} de ${r.totalMonths} meses · ${currentMonth > r.endMonth ? '✅ Concluído' : `até ${r.endMonth}`}</div>
+        </div>` : '<div style="font-size:10px;color:var(--text-hint);margin-top:3px">♾️ Recorrência contínua</div>'}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <div class="recur-amount">-${fmtCurrency(r.amount)}</div>
+        <div class="recur-actions">
+          <button class="expense-action-btn" onclick="openRecurModal('${r.id}')">✏️</button>
+          <button class="expense-action-btn del" onclick="deleteRecur('${r.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function openRecurModal(editId) {
+  editId = editId || null;
+  editingRecurId = editId;
+  selectedRecurCategory = null;
+  selectedRecurPerson = 'Welinton';
+
+  // Populate category grid
+  document.getElementById('recurCatGrid').innerHTML = getAllCategories().map(c => `
+    <div class="cat-chip" id="recurChip-${c.id}" onclick="selectRecurCategory('${c.id}')">
+      <span class="cat-icon">${c.icon}</span>
+      <span class="cat-name">${c.label}</span>
+    </div>`).join('');
+
+  document.getElementById('recurModalTitle').textContent = editId ? 'Editar gasto fixo' : 'Novo gasto fixo';
+  document.getElementById('recurSubmitBtn').textContent = editId ? 'Salvar' : 'Salvar gasto fixo';
+
+  if (editId) {
+    const r = recurringExpenses.find(x => x.id === editId);
+    if (r) {
+      selectRecurPerson(r.person);
+      document.getElementById('recurDescInput').value = r.description;
+      document.getElementById('recurAmountInput').value = r.amount.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+      document.getElementById('recurDayInput').value = r.day;
+      selectedRecurCategory = r.category;
+      // Restore duration
+      const dur = r.totalMonths || 0;
+      if ([0,3,6,12].includes(dur)) {
+        selectDuration(dur);
+      } else if (dur > 0) {
+        selectDuration('custom');
+        document.getElementById('recurDurationCustom').value = dur;
+      } else {
+        selectDuration(0);
+      }
+      setTimeout(() => {
+        const chip = document.getElementById(`recurChip-${r.category}`);
+        if (chip) chip.classList.add('selected');
+      }, 50);
+    }
+  } else {
+    document.getElementById('recurDescInput').value = '';
+    document.getElementById('recurAmountInput').value = '';
+    document.getElementById('recurDayInput').value = '';
+    document.getElementById('recurDurationCustom').value = '';
+    selectRecurPerson('Welinton');
+    selectDuration(0);
+  }
+
+  document.getElementById('recurModal').classList.add('open');
+  setTimeout(() => document.getElementById('recurDescInput').focus(), 350);
+}
+function closeRecurModal() { document.getElementById('recurModal').classList.remove('open'); }
+function handleRecurModalClick(e) { if (e.target===e.currentTarget) closeRecurModal(); }
+
+function selectRecurPerson(p) {
+  selectedRecurPerson = p;
+  document.getElementById('recurBtnW').classList.toggle('selected', p==='Welinton');
+  document.getElementById('recurBtnD').classList.toggle('selected', p==='Débora');
+}
+function selectRecurCategory(id) {
+  selectedRecurCategory = id;
+  document.querySelectorAll('[id^="recurChip-"]').forEach(c => c.classList.remove('selected'));
+  document.getElementById(`recurChip-${id}`).classList.add('selected');
+}
+
+function submitRecur() {
+  const desc = document.getElementById('recurDescInput').value.trim();
+  const raw = document.getElementById('recurAmountInput').value.replace(/\./g,'').replace(',','.');
+  const amount = parseFloat(raw) || 0;
+  const day = parseInt(document.getElementById('recurDayInput').value) || 0;
+
+  if (!desc) { showToast('⚠️ Digite uma descrição'); vibrate(100); return; }
+  if (!amount || amount <= 0) { showToast('⚠️ Informe um valor válido'); vibrate(100); return; }
+  if (!selectedRecurCategory) { showToast('⚠️ Selecione uma categoria'); vibrate(100); return; }
+  if (!day || day < 1 || day > 31) { showToast('⚠️ Informe um dia válido (1-31)'); vibrate(100); return; }
+
+  // Resolve duration
+  let totalMonths = 0;
+  if (selectedDuration === 'custom') {
+    totalMonths = parseInt(document.getElementById('recurDurationCustom').value) || 0;
+    if (totalMonths < 1) { showToast('⚠️ Informe a quantidade de meses'); vibrate(100); return; }
+  } else {
+    totalMonths = selectedDuration; // 0 = indeterminate
+  }
+
+  // Compute start and end month
+  const now = new Date();
+  const startMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  let endMonth = null;
+  if (totalMonths > 0) {
+    const endDate = new Date(now.getFullYear(), now.getMonth() + totalMonths - 1, 1);
+    endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}`;
+  }
+
+  const cat = getAllCategories().find(c => c.id === selectedRecurCategory);
+  const recurData = {
+    person: selectedRecurPerson, description: desc, amount,
+    category: selectedRecurCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
+    day, totalMonths, startMonth, endMonth
+  };
+
+  if (editingRecurId) {
+    const idx = recurringExpenses.findIndex(r => r.id === editingRecurId);
+    if (idx !== -1) recurringExpenses[idx] = { ...recurringExpenses[idx], ...recurData };
+  } else {
+    recurringExpenses.push({ id: Date.now().toString(36), launchedCount: 0, ...recurData });
+  }
+  saveRecurring();
+  closeRecurModal();
+  renderRecurList();
+  vibrate(40);
+  const durLabel = totalMonths === 0 ? 'sem data de término' : `por ${totalMonths} mês(es)`;
+  showToast(`🔄 Gasto fixo salvo — ${durLabel}!`);
+  checkAndLaunchRecurring();
+}
+
+function deleteRecur(id) {
+  if (!confirm('Remover este gasto fixo?')) return;
+  recurringExpenses = recurringExpenses.filter(r => r.id !== id);
+  saveRecurring();
+  renderRecurList();
+  vibrate([50,30,50]);
+  showToast('🗑️ Gasto fixo removido');
+}
+
+// ════════════════════════════════════════════════
+// CATEGORY HISTORY
+// ════════════════════════════════════════════════
+function openCatHistory(catId) {
+  const cat = getAllCategories().find(c => c.id === catId);
+  if (!cat) return;
+  const prefix = getViewMonthPrefix();
+  const { year, month } = getViewMonth();
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  const filtered = expenses.filter(e => {
+    const matchCat = e.category === catId ||
+                     e.categoryLabel === cat.label ||
+                     (e.category||'').toLowerCase() === catId.toLowerCase() ||
+                     normStr(e.categoryLabel) === normStr(cat.label);
+    return matchCat && e.date.startsWith(prefix);
+  })
+    .sort((a,b) => b.date.localeCompare(a.date));
+
+  document.getElementById('catHistIcon').textContent = cat.icon;
+  document.getElementById('catHistTitle').textContent = cat.label;
+  document.getElementById('catHistPeriod').textContent = `${months[month-1]}/${year} · ${filtered.length} lançamento(s)`;
+
+  const total = filtered.reduce((s,e) => s+e.amount, 0);
+  document.getElementById('catHistTotal').textContent = fmtCurrency(total);
+  document.getElementById('catHistCount').textContent = filtered.length;
+
+  if (!filtered.length) {
+    document.getElementById('catHistList').innerHTML = '<div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-title">Sem gastos</div><div class="empty-desc">Nenhum lançamento nesta categoria este mês</div></div>';
+  } else {
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now()-86400000).toISOString().split('T')[0];
+    document.getElementById('catHistList').innerHTML = filtered.map(e => {
+      const d = new Date(e.date+'T12:00:00');
+      const label = e.date===today?'Hoje':e.date===yesterday?'Ontem':d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+      return `<div class="cat-hist-item">
+        <div class="cat-hist-info">
+          <div class="cat-hist-desc">${e.description}</div>
+          <div class="cat-hist-meta">
+            <span class="expense-person-badge ${e.person==='Welinton'?'badge-w':'badge-d'}">${e.person}</span>
+            <span>${label}</span>
+          </div>
+        </div>
+        <div class="cat-hist-amount">-${fmtCurrency(e.amount)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('catHistModal').classList.add('open');
+}
+function closeCatHistModal() { document.getElementById('catHistModal').classList.remove('open'); }
+function handleCatHistModalClick(e) { if (e.target===e.currentTarget) closeCatHistModal(); }
+
+// ════════════════════════════════════════════════
+// MONTHLY EVOLUTION CHART
+// ════════════════════════════════════════════════
+function renderMonthlyChart() {
+  const chart = document.getElementById('monthlyChart');
+  if (!chart) return;
+
+  const now = new Date();
+  const monthLabels = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  // Last 6 months
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      label: monthLabels[d.getMonth()],
+      prefix: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
+      isCurrent: i === 0
+    });
+  }
+
+  const totals = months.map(m => ({
+    ...m,
+    total: expenses.filter(e => e.date.startsWith(m.prefix)).reduce((s,e) => s+e.amount, 0)
+  }));
+
+  const max = Math.max(...totals.map(m => m.total), 1);
+
+  chart.innerHTML = totals.map(m => {
+    const barH = Math.max((m.total / max) * 80, m.total > 0 ? 4 : 0);
+    return `
+    <div class="monthly-col" onclick="jumpToMonth('${m.prefix}')">
+      <div class="monthly-bar-wrap">
+        <div class="monthly-bar ${m.isCurrent ? 'current' : ''}" style="height:${barH}px" title="${fmtCurrency(m.total)}"></div>
+      </div>
+      <div class="monthly-val">${m.total > 0 ? 'R$'+Math.round(m.total/1000)+'k' : '-'}</div>
+      <div class="monthly-label ${m.isCurrent ? 'current' : ''}">${m.label}</div>
+    </div>`;
+  }).join('');
+}
+
+function jumpToMonth(prefix) {
+  const [year, month] = prefix.split('-');
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  currentMonthOffset = (parseInt(year) - currentYear) * 12 + (parseInt(month) - currentMonth);
+  updateMonthLabel();
+  updateHeader();
+  renderExpenses();
+  showScreen('home');
+  showToast(`📅 Exibindo ${prefix}`);
+}
+
+// ════════════════════════════════════════════
+// CONFIG SYNC — categories, budgets, overrides
+// ════════════════════════════════════════════
+
+async function syncConfig() {
+  if (!fbReady) return;
+  try {
+    const { db, ref, set } = getFB();
+    const overrides = JSON.parse(localStorage.getItem('fin_cat_overrides') || '{}');
+    await set(ref(db, 'config/app'), {
+      customCategories,
+      categoryBudgets,
+      budget,
+      catOverrides: overrides,
+      updatedAt: new Date().toISOString()
+    });
+    console.log('syncConfig: saved to Firebase');
+  } catch(e) { console.log('syncConfig error:', e); }
+}
+
+async function syncRecurring() {
+  if (!fbReady) return;
+  try {
+    const { db, ref, set } = getFB();
+    await set(ref(db, 'config/recurring'), {
+      recurringExpenses,
+      updatedAt: new Date().toISOString()
+    });
+    console.log('syncRecurring: saved to Firebase');
+  } catch(e) { console.log('syncRecurring error:', e); }
+}
+
+async function fetchRecurring(silent) {
+  if (!config.scriptUrl) return;
+  try {
+    const url = config.scriptUrl + '?action=getRecurring&t=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { return; }
+    if (!data.recurringData) return;
+
+    const remote = data.recurringData;
+    const localUpdated = localStorage.getItem('fin_recurring_updated') || '';
+    const remoteUpdated = remote.updatedAt || '';
+
+    if (remoteUpdated <= localUpdated) return;
+
+    if (remote.recurringExpenses && Array.isArray(remote.recurringExpenses)) {
+      const localIds = new Set(recurringExpenses.map(r => r.id));
+      let added = 0;
+      remote.recurringExpenses.forEach(rr => {
+        if (!localIds.has(rr.id)) {
+          recurringExpenses.push(rr);
+          added++;
+        } else {
+          // Update existing if remote is newer
+          const idx = recurringExpenses.findIndex(x => x.id === rr.id);
+          recurringExpenses[idx] = rr;
+        }
+      });
+      localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses));
+      localStorage.setItem('fin_recurring_updated', remoteUpdated);
+      if (document.getElementById('screen-recur') &&
+          document.getElementById('screen-recur').classList.contains('active')) {
+        renderRecurList();
+      }
+      if (added > 0 && !silent) showToast('🔄 ' + added + ' gasto(s) fixo(s) recebido(s)!');
+    }
+  } catch(e) { console.log('fetchRecurring error:', e); }
+}
+
+async function fetchConfig(silent) {
+  if (!config.scriptUrl) return;
+  try {
+    const url = config.scriptUrl + '?action=getConfig&t=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { return; }
+    if (!data.configData) return;
+
+    const remote = data.configData;
+    const localUpdated = localStorage.getItem('fin_config_updated') || '';
+    const remoteUpdated = remote.updatedAt || '';
+
+    // Only update if remote is newer
+    if (remoteUpdated <= localUpdated) {
+      if (!silent) showToast('✅ Configurações já atualizadas!');
+      return;
+    }
+
+    let changed = false;
+
+    // Sync custom categories
+    if (remote.customCategories && Array.isArray(remote.customCategories)) {
+      const localIds = new Set(customCategories.map(c => c.id));
+      remote.customCategories.forEach(rc => {
+        if (!localIds.has(rc.id)) { customCategories.push(rc); changed = true; }
+      });
+      localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+    }
+
+    // Sync category budgets
+    if (remote.categoryBudgets && typeof remote.categoryBudgets === 'object') {
+      Object.entries(remote.categoryBudgets).forEach(([id, val]) => {
+        if (!categoryBudgets[id]) { categoryBudgets[id] = val; changed = true; }
+      });
+      localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
+    }
+
+    // Sync global budget
+    if (remote.budget && remote.budget > 0 && remote.budget !== budget) {
+      budget = remote.budget;
+      localStorage.setItem('fin_budget', budget.toString());
+      const bi = document.getElementById('budgetInput');
+      if (bi) bi.value = budget.toFixed(2);
+      changed = true;
+    }
+
+    // Sync category overrides (renamed default categories)
+    if (remote.catOverrides && typeof remote.catOverrides === 'object') {
+      const localOverrides = JSON.parse(localStorage.getItem('fin_cat_overrides') || '{}');
+      let overrideChanged = false;
+      Object.entries(remote.catOverrides).forEach(([id, data]) => {
+        if (!localOverrides[id]) {
+          localOverrides[id] = data;
+          const cat = CATEGORIES.find(c => c.id === id);
+          if (cat) { cat.label = data.label; cat.icon = data.icon; }
+          overrideChanged = true;
+        }
+      });
+      if (overrideChanged) {
+        localStorage.setItem('fin_cat_overrides', JSON.stringify(localOverrides));
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      localStorage.setItem('fin_config_updated', remoteUpdated);
+      renderCategoryGrid();
+      renderCatScreen();
+      updateHeader();
+      if (!silent) showToast('🔄 Configurações sincronizadas!');
+      else showToast('🔄 Novas configurações recebidas!');
+    }
+
+  } catch(e) { console.log('fetchConfig error:', e); }
+}
+
+// View mode removed — always normal
+
+// ════════════════════════════════════════════
+// SYNC TIMESTAMP
+// ════════════════════════════════════════════
+function updateSyncTime() {
+  const el = document.getElementById('syncTime');
+  if (!el) return;
+  const last = localStorage.getItem('fin_last_sync');
+  if (!last) { el.textContent = ''; return; }
+  const diff = Math.floor((Date.now() - new Date(last).getTime()) / 1000);
+  if (diff < 60) el.textContent = ' · agora';
+  else if (diff < 3600) el.textContent = ` · há ${Math.floor(diff/60)}min`;
+  else el.textContent = ` · há ${Math.floor(diff/3600)}h`;
+}
+setInterval(updateSyncTime, 30000);
+
+// ════════════════════════════════════════════
+// INSTALLMENT (PARCELADO)
+// ════════════════════════════════════════════
+let installmentActive = false;
+
+function toggleInstallment() {
+  installmentActive = !installmentActive;
+  document.getElementById('installmentToggle').classList.toggle('active', installmentActive);
+  document.getElementById('installmentFields').style.display = installmentActive ? 'block' : 'none';
+  if (!installmentActive) {
+    document.getElementById('installmentBadge').style.display = 'none';
+    document.getElementById('installmentPreview').style.display = 'none';
+    document.getElementById('installmentCount').value = '';
+    document.getElementById('installmentTotal').value = '';
+  }
+}
+
+function updateInstallmentPreview() {
+  const count = parseInt(document.getElementById('installmentCount').value) || 0;
+  const rawTotal = document.getElementById('installmentTotal').value.replace(/\./g,'').replace(',','.');
+  const total = parseFloat(rawTotal) || 0;
+  const preview = document.getElementById('installmentPreview');
+  const badge = document.getElementById('installmentBadge');
+
+  if (count >= 2 && total > 0) {
+    const perMonth = total / count;
+    preview.style.display = 'block';
+    preview.textContent = `${count}x de ${fmtCurrency(perMonth)} = ${fmtCurrency(total)} no total`;
+    badge.style.display = 'inline';
+    badge.textContent = `${count}x`;
+    // Update main amount field with per-month value
+    document.getElementById('amountInput').value = perMonth.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  } else {
+    preview.style.display = 'none';
+    badge.style.display = 'none';
+  }
+}
+
+// ════════════════════════════════════════════
+// QUICK CATEGORIES (top 3 this month)
+// ════════════════════════════════════════════
+function renderQuickCats() {
+  const prefix = getViewMonthPrefix();
+  const monthExp = expenses.filter(e => e.date.startsWith(prefix));
+  const counts = {};
+  monthExp.forEach(e => { counts[e.category] = (counts[e.category]||0) + 1; });
+  const top3 = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id]) => id);
+
+  const wrap = document.getElementById('quickCatsWrap');
+  const qc = document.getElementById('quickCats');
+  if (!top3.length) { if(wrap) wrap.style.display='none'; return; }
+  if(wrap) wrap.style.display='block';
+
+  const allCats = getAllCategories();
+  if(qc) qc.innerHTML = top3.map(id => {
+    const cat = allCats.find(c=>c.id===id);
+    if (!cat) return '';
+    return `<button class="quick-cat-btn ${selectedCategory===id?'selected':''}" id="qcat-${id}" onclick="selectCategory('${id}');updateQuickCatSelection('${id}')">
+      ${cat.icon} ${cat.label}
+    </button>`;
+  }).join('');
+}
+
+function updateQuickCatSelection(id) {
+  document.querySelectorAll('.quick-cat-btn').forEach(b => b.classList.remove('selected'));
+  const el = document.getElementById('qcat-'+id);
+  if (el) el.classList.add('selected');
+}
+
+// ════════════════════════════════════════════
+// CATEGORY COMPARISON (month vs previous)
+// ════════════════════════════════════════════
+function renderCategoryComparison() {
+  const { year, month } = getViewMonth();
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  // Current month
+  const curPrefix = `${year}-${String(month).padStart(2,'0')}`;
+  // Previous month
+  const prevDate = new Date(year, month-2, 1);
+  const prevPrefix = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
+  const prevLabel = months[prevDate.getMonth()];
+
+  const labelEl = document.getElementById('compareMonthLabel');
+  if (labelEl) labelEl.textContent = `vs ${prevLabel}/${prevDate.getFullYear()}`;
+
+  const curExp = expenses.filter(e => e.date.startsWith(curPrefix));
+  const prevExp = expenses.filter(e => e.date.startsWith(prevPrefix));
+
+  // Group by category
+  const curByCat = {};
+  curExp.forEach(e => { curByCat[e.categoryLabel] = (curByCat[e.categoryLabel]||{sum:0,icon:e.categoryIcon}); curByCat[e.categoryLabel].sum+=e.amount; });
+  const prevByCat = {};
+  prevExp.forEach(e => { prevByCat[e.categoryLabel] = (prevByCat[e.categoryLabel]||{sum:0,icon:e.categoryIcon}); prevByCat[e.categoryLabel].sum+=e.amount; });
+
+  // Merge all categories
+  const allLabels = new Set([...Object.keys(curByCat), ...Object.keys(prevByCat)]);
+  const rows = Array.from(allLabels).map(label => ({
+    label,
+    icon: (curByCat[label]||prevByCat[label]).icon,
+    cur: curByCat[label]?.sum || 0,
+    prev: prevByCat[label]?.sum || 0,
+  })).sort((a,b) => b.cur - a.cur).slice(0,8);
+
+  const container = document.getElementById('categoryCompare');
+  if (!container) return;
+
+  if (!rows.length) { container.innerHTML = '<p style="font-size:13px;color:var(--text-hint);text-align:center;padding:16px 0">Sem dados para comparar</p>'; return; }
+
+  container.innerHTML = rows.map(r => {
+    const diff = r.cur - r.prev;
+    const pct = r.prev > 0 ? ((diff/r.prev)*100).toFixed(0) : null;
+    let diffClass = 'diff-same', diffIcon = '→', diffText = 'novo';
+    if (r.prev > 0) {
+      if (diff > 0) { diffClass='diff-up'; diffIcon='↑'; diffText=`+${pct}%`; }
+      else if (diff < 0) { diffClass='diff-down'; diffIcon='↓'; diffText=`${pct}%`; }
+      else { diffClass='diff-same'; diffIcon='→'; diffText='igual'; }
+    }
+    return `<div class="cat-compare-row">
+      <div class="cat-compare-icon">${r.icon}</div>
+      <div class="cat-compare-info">
+        <div class="cat-compare-name">${r.label}</div>
+        <div class="cat-compare-amounts">${fmtCurrency(r.cur)} este mês · ${r.prev>0?fmtCurrency(r.prev)+' anterior':'sem dados anteriores'}</div>
+      </div>
+      <div class="cat-compare-diff ${diffClass}">${diffIcon} ${diffText}</div>
+    </div>`;
+  }).join('');
+}
+
 // ── Toast ──
 let toastTimer;
 function showToast(msg) {
@@ -1682,6 +2911,10 @@ window.addEventListener('popstate', function(e) {
   if (delModal && delModal.classList.contains('open')) { closeDelModal(); return; }
   if (catModal && catModal.classList.contains('open')) { closeCatModal(); return; }
   if (catBudgetModal && catBudgetModal.classList.contains('open')) { closeCatBudgetModal(); return; }
+  const catHistModal = document.getElementById('catHistModal');
+  const recurModal = document.getElementById('recurModal');
+  if (catHistModal && catHistModal.classList.contains('open')) { closeCatHistModal(); return; }
+  if (recurModal && recurModal.classList.contains('open')) { closeRecurModal(); return; }
   if (delCatModal && delCatModal.classList.contains('open')) { closeDelCatModal(); return; }
   if (exitModal && exitModal.classList.contains('open')) { closeExitModal(); return; }
 
