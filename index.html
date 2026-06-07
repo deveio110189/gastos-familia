@@ -311,53 +311,6 @@
     .pwd-btn-cancel { padding: 13px; border-radius: var(--radius-sm); border: 2px solid var(--border-strong); background: transparent; color: var(--text); font-family: var(--font); font-size: 15px; font-weight: 600; cursor: pointer; }
     .pwd-btn-confirm { padding: 13px; border-radius: var(--radius-sm); border: none; background: var(--green-500); color: white; font-family: var(--font); font-size: 15px; font-weight: 600; cursor: pointer; }
     @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
-
-    /* ── Recurring expenses ── */
-    .recur-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-    .recur-item:last-child { border-bottom: none; }
-    .recur-info { flex: 1; min-width: 0; }
-    .recur-name { font-size: 14px; font-weight: 600; }
-    .recur-meta { font-size: 12px; color: var(--text-hint); margin-top: 2px; }
-    .recur-amount { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--red-700); flex-shrink: 0; }
-    .recur-actions { display: flex; gap: 4px; }
-    .recur-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; background: var(--green-50); color: var(--green-900); }
-
-    /* ── Category history modal ── */
-    .cat-hist-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-    .cat-hist-item:last-child { border-bottom: none; }
-    .cat-hist-info { flex: 1; min-width: 0; }
-    .cat-hist-desc { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .cat-hist-meta { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
-    .cat-hist-amount { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--red-700); }
-
-    /* ── Monthly chart ── */
-    .monthly-chart-wrap { overflow-x: auto; padding-bottom: 4px; }
-    .monthly-chart { display: flex; align-items: flex-end; gap: 8px; min-width: max-content; padding: 8px 0; }
-    .monthly-col { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 44px; }
-    .monthly-bar-wrap { width: 100%; display: flex; align-items: flex-end; height: 80px; }
-    .monthly-bar { width: 100%; border-radius: 6px 6px 0 0; background: var(--green-500); transition: height 0.4s ease; min-height: 4px; cursor: pointer; }
-    .monthly-bar.current { background: var(--green-700); }
-    .monthly-bar:active { opacity: 0.8; }
-    .monthly-val { font-size: 9px; font-family: var(--mono); color: var(--text-hint); text-align: center; white-space: nowrap; }
-    .monthly-label { font-size: 10px; font-weight: 600; color: var(--text-muted); }
-    .monthly-label.current { color: var(--green-700); }
-
-    /* ── Notification badge ── */
-    .notif-badge { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--red-500); }
-
-    /* ── Recurring duration selector ── */
-    .duration-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 4px; }
-    .duration-chip { padding: 8px 4px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--surface-raised); cursor: pointer; text-align: center; transition: all 0.15s; font-family: var(--font); }
-    .duration-chip.selected { border-color: var(--green-500); background: var(--green-50); }
-    .duration-chip:active { transform: scale(0.95); }
-    .duration-chip-num { font-size: 16px; font-weight: 700; color: var(--text); }
-    .duration-chip-label { font-size: 10px; color: var(--text-hint); font-weight: 500; }
-    .duration-chip.selected .duration-chip-num { color: var(--green-900); }
-    .duration-chip.selected .duration-chip-label { color: var(--green-700); }
-    .recur-progress { margin-top: 6px; }
-    .recur-progress-track { height: 4px; background: var(--gray-100); border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
-    .recur-progress-fill { height: 100%; border-radius: 2px; background: var(--green-500); }
-    .recur-progress-label { font-size: 10px; color: var(--text-hint); font-family: var(--mono); }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -436,14 +389,6 @@
       <div id="expenseList"></div>
     </div>
 
-    <!-- Recurring -->
-    <div class="screen" id="screen-recur">
-      <button class="add-cat-btn" onclick="openRecurModal()">
-        <span style="font-size:20px">+</span> Novo gasto fixo
-      </button>
-      <div id="recurList"></div>
-    </div>
-
     <!-- Categories -->
     <div class="screen" id="screen-cats">
       <button class="add-cat-btn" onclick="openCatModal()">
@@ -459,13 +404,6 @@
         <div class="stat-card"><div class="stat-label">Lançamentos</div><div class="stat-value blue" id="statCount">0</div></div>
         <div class="stat-card"><div class="stat-label">Welinton</div><div class="stat-value amber" id="statW">R$ 0</div></div>
         <div class="stat-card"><div class="stat-label">Débora</div><div class="stat-value green" id="statD">R$ 0</div></div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Evolução mensal</div>
-        <div class="monthly-chart-wrap">
-          <div class="monthly-chart" id="monthlyChart"></div>
-        </div>
       </div>
 
       <div class="card">
@@ -616,10 +554,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span>Categorias</span>
     </button>
-    <button class="nav-btn" onclick="showScreen('recur')" id="nav-recur" style="position:relative">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 1l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 11V9a4 4 0 014-4h14" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 23l-4-4 4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 13v2a4 4 0 01-4 4H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>Fixos</span>
-    </button>
     <button class="nav-btn" onclick="showScreen('stats')" id="nav-stats">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="12" width="4" height="9" rx="1" stroke-linecap="round" stroke-linejoin="round"/><rect x="10" y="7" width="4" height="14" rx="1" stroke-linecap="round" stroke-linejoin="round"/><rect x="17" y="3" width="4" height="18" rx="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span>Resumo</span>
@@ -698,101 +632,6 @@
         <button class="pwd-btn-cancel" onclick="closePwdModal()">Cancelar</button>
         <button class="pwd-btn-confirm" onclick="checkPassword()">Entrar</button>
       </div>
-    </div>
-  </div>
-
-  <!-- Add/Edit Recurring Modal -->
-  <div class="modal-overlay" id="recurModal" onclick="handleRecurModalClick(event)">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-title" id="recurModalTitle">Novo gasto fixo</div>
-
-      <div class="form-group">
-        <label class="form-label">Quem é o responsável?</label>
-        <div class="person-picker">
-          <button class="person-btn selected" onclick="selectRecurPerson('Welinton')" id="recurBtnW">
-            <div class="person-btn-avatar avatar-w">W</div>
-            <div class="person-btn-name">Welinton</div>
-          </button>
-          <button class="person-btn" onclick="selectRecurPerson('Débora')" id="recurBtnD">
-            <div class="person-btn-avatar avatar-d">D</div>
-            <div class="person-btn-name">Débora</div>
-          </button>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Descrição</label>
-        <input type="text" class="text-input" id="recurDescInput" placeholder="Ex: Aluguel, Netflix, Academia..." maxlength="60" />
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Valor</label>
-        <div class="amount-input-wrap">
-          <span class="currency-prefix">R$</span>
-          <input type="text" class="amount-input" id="recurAmountInput" placeholder="0,00" inputmode="numeric" />
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Categoria</label>
-        <div class="cat-grid" id="recurCatGrid"></div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Dia do vencimento</label>
-        <input type="number" class="text-input" id="recurDayInput" placeholder="Ex: 5" min="1" max="31" inputmode="numeric" />
-        <p style="font-size:12px;color:var(--text-hint);margin-top:6px">O gasto será lançado automaticamente todo mês neste dia</p>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Por quantos meses?</label>
-        <div class="duration-grid">
-          <div class="duration-chip selected" id="dur-0" onclick="selectDuration(0)">
-            <div class="duration-chip-num">∞</div>
-            <div class="duration-chip-label">Sempre</div>
-          </div>
-          <div class="duration-chip" id="dur-3" onclick="selectDuration(3)">
-            <div class="duration-chip-num">3</div>
-            <div class="duration-chip-label">meses</div>
-          </div>
-          <div class="duration-chip" id="dur-6" onclick="selectDuration(6)">
-            <div class="duration-chip-num">6</div>
-            <div class="duration-chip-label">meses</div>
-          </div>
-          <div class="duration-chip" id="dur-12" onclick="selectDuration(12)">
-            <div class="duration-chip-num">12</div>
-            <div class="duration-chip-label">meses</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-          <span style="font-size:12px;color:var(--text-muted);font-weight:500">Outro:</span>
-          <input type="number" class="text-input" id="recurDurationCustom" placeholder="Ex: 18" min="1" max="360" inputmode="numeric" style="flex:1" oninput="selectDuration('custom')" />
-          <span style="font-size:12px;color:var(--text-muted)">meses</span>
-        </div>
-        <p id="recurDurationHint" style="font-size:12px;color:var(--text-hint);margin-top:6px">♾️ Sem data de término — cancele quando quiser</p>
-      </div>
-
-      <button class="btn-primary" id="recurSubmitBtn" onclick="submitRecur()">Salvar gasto fixo</button>
-    </div>
-  </div>
-
-  <!-- Category History Modal -->
-  <div class="modal-overlay" id="catHistModal" onclick="handleCatHistModalClick(event)">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-        <div style="font-size:28px" id="catHistIcon">📋</div>
-        <div>
-          <div style="font-size:18px;font-weight:700" id="catHistTitle">Categoria</div>
-          <div style="font-size:13px;color:var(--text-hint)" id="catHistPeriod"></div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-        <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value red" id="catHistTotal">R$ 0</div></div>
-        <div class="stat-card"><div class="stat-label">Lançamentos</div><div class="stat-value blue" id="catHistCount">0</div></div>
-      </div>
-      <div id="catHistList"></div>
     </div>
   </div>
 
@@ -934,8 +773,6 @@ let currentMonthOffset = 0; // 0 = current month, -1 = last month, etc.
 function init() {
   setTimeout(() => document.getElementById('splash').classList.add('hide'), 1800);
   loadCategories();
-  loadRecurring();
-  setTimeout(checkAndLaunchRecurring, 1500);
   loadFromStorage();
   renderCategoryGrid();
   setDefaultDate();
@@ -980,7 +817,7 @@ function changeMonth(dir) {
   updateMonthLabel();
   updateHeader();
   renderExpenses();
-  if (document.getElementById('screen-stats').classList.contains('active')) { renderStats(); renderMonthlyChart(); }
+  if (document.getElementById('screen-stats').classList.contains('active')) renderStats();
 }
 
 function getViewMonth() {
@@ -1030,9 +867,8 @@ function showScreen(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`screen-${name}`).classList.add('active');
   document.getElementById(`nav-${name}`).classList.add('active');
-  if (name === 'stats') { renderStats(); renderMonthlyChart(); }
+  if (name === 'stats') renderStats();
   if (name === 'cats') renderCatScreen();
-  if (name === 'recur') renderRecurList();
 }
 
 // ── Person filter ──
@@ -1548,14 +1384,13 @@ function renderCatScreen() {
     const budgetLabel = bgt > 0 ? `de ${fmtCurrency(bgt)}` : '';
     return `<div class="cat-card">
       <div class="cat-card-header">
-        <div class="cat-card-icon" onclick="openCatHistory('${cat.id}')" style="cursor:pointer">${cat.icon}</div>
-        <div style="flex:1;min-width:0" onclick="openCatHistory('${cat.id}')" style="cursor:pointer">
+        <div class="cat-card-icon">${cat.icon}</div>
+        <div style="flex:1;min-width:0">
           <div class="cat-card-name">${cat.label}</div>
           <div class="cat-card-meta">${spentLabel}${budgetLabel ? ` ${budgetLabel}` : ' este mês'}</div>
         </div>
         <div class="cat-card-actions">
-          <button class="cat-card-btn" onclick="openCatHistory('${cat.id}')">📋</button>
-          <button class="cat-card-btn" onclick="openCatBudgetModal('${cat.id}')">💰</button>
+          <button class="cat-card-btn" onclick="openCatBudgetModal('${cat.id}')">💰 Orçamento</button>
           <button class="cat-card-btn" onclick="openCatModal('${cat.id}')">✏️</button>
           ${!isDefault ? `<button class="cat-card-btn del-btn" onclick="openDelCatModal('${cat.id}')">🗑️</button>` : ''}
         </div>
@@ -1778,363 +1613,6 @@ function checkPassword() {
   }
 }
 
-// ════════════════════════════════════════════════
-// RECURRING EXPENSES
-// ════════════════════════════════════════════════
-let recurringExpenses = [];
-let editingRecurId = null;
-let selectedRecurPerson = 'Welinton';
-let selectedRecurCategory = null;
-let selectedDuration = 0; // 0 = indeterminate
-
-function selectDuration(val) {
-  selectedDuration = val === 'custom' ? 'custom' : parseInt(val);
-  [0, 3, 6, 12].forEach(v => {
-    const el = document.getElementById(`dur-${v}`);
-    if (el) el.classList.toggle('selected', v === selectedDuration);
-  });
-  const hint = document.getElementById('recurDurationHint');
-  if (val === 0) {
-    hint.textContent = '♾️ Sem data de término — cancele quando quiser';
-    document.getElementById('recurDurationCustom').value = '';
-  } else if (val === 'custom') {
-    const custom = parseInt(document.getElementById('recurDurationCustom').value) || 0;
-    hint.textContent = custom > 0 ? `📅 Será lançado por ${custom} meses` : '📅 Digite a quantidade de meses';
-    [0,3,6,12].forEach(v => { const el = document.getElementById(`dur-${v}`); if(el) el.classList.remove('selected'); });
-  } else {
-    hint.textContent = `📅 Será lançado por ${val} meses e depois cancelado automaticamente`;
-    document.getElementById('recurDurationCustom').value = '';
-  }
-}
-
-function loadRecurring() {
-  const r = localStorage.getItem('fin_recurring');
-  if (r) recurringExpenses = JSON.parse(r);
-}
-function saveRecurring() { localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses)); }
-
-function checkAndLaunchRecurring() {
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const currentMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
-  let changed = false;
-
-  recurringExpenses.forEach(recur => {
-    // Check if expired (endMonth defined and already passed)
-    if (recur.endMonth && currentMonth > recur.endMonth) {
-      return; // skip silently — auto-expired
-    }
-
-    // Check if already launched this month
-    const alreadyLaunched = expenses.some(e =>
-      e.recurringId === recur.id && e.date.startsWith(currentMonth)
-    );
-    if (alreadyLaunched) return;
-
-    // Check if today is on or past the due day this month
-    const dueDay = parseInt(recur.day);
-    const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
-    const actualDay = Math.min(dueDay, daysInMonth);
-    const dueDate = `${currentMonth}-${String(actualDay).padStart(2,'0')}`;
-
-    if (todayStr >= dueDate) {
-      const expense = {
-        id: 'recur_' + recur.id + '_' + currentMonth,
-        recurringId: recur.id,
-        person: recur.person,
-        amount: recur.amount,
-        category: recur.category,
-        categoryLabel: recur.categoryLabel,
-        categoryIcon: recur.categoryIcon,
-        description: recur.description + ' (fixo)',
-        date: dueDate,
-        createdAt: new Date().toISOString(),
-        synced: false,
-        isRecurring: true
-      };
-      expenses.unshift(expense);
-      recur.launchedCount = (recur.launchedCount || 0) + 1;
-      changed = true;
-      saveToStorage();
-      syncExpense(expense, 'addExpense');
-
-      // Progress label
-      const progLabel = recur.totalMonths > 0
-        ? ` (${recur.launchedCount}/${recur.totalMonths})`
-        : '';
-      showToast(`🔄 ${recur.categoryIcon} "${recur.description}"${progLabel} lançado!`);
-    }
-  });
-
-  if (changed) saveRecurring();
-  localStorage.setItem('fin_recur_lastcheck', todayStr);
-  updateHeader();
-  renderExpenses();
-}
-
-function renderRecurList() {
-  const list = document.getElementById('recurList');
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  if (!recurringExpenses.length) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔄</div><div class="empty-title">Nenhum gasto fixo</div><div class="empty-desc">Adicione gastos que se repetem todo mês como aluguel, internet, assinaturas...</div></div>`;
-    return;
-  }
-  list.innerHTML = recurringExpenses.map(r => `
-    <div class="recur-item">
-      <div class="expense-cat-icon">${r.categoryIcon}</div>
-      <div class="recur-info">
-        <div class="recur-name">${r.description}</div>
-        <div class="recur-meta">
-          <span class="expense-person-badge ${r.person==='Welinton'?'badge-w':'badge-d'}">${r.person}</span>
-          <span>${r.categoryLabel} · dia ${r.day}</span>
-        </div>
-        ${r.totalMonths > 0 ? `
-        <div class="recur-progress">
-          <div class="recur-progress-track">
-            <div class="recur-progress-fill" style="width:${Math.min(((r.launchedCount||0)/r.totalMonths)*100,100).toFixed(0)}%"></div>
-          </div>
-          <div class="recur-progress-label">${r.launchedCount||0} de ${r.totalMonths} meses · ${currentMonth > r.endMonth ? '✅ Concluído' : `até ${r.endMonth}`}</div>
-        </div>` : '<div style="font-size:10px;color:var(--text-hint);margin-top:3px">♾️ Recorrência contínua</div>'}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-        <div class="recur-amount">-${fmtCurrency(r.amount)}</div>
-        <div class="recur-actions">
-          <button class="expense-action-btn" onclick="openRecurModal('${r.id}')">✏️</button>
-          <button class="expense-action-btn del" onclick="deleteRecur('${r.id}')">🗑️</button>
-        </div>
-      </div>
-    </div>`).join('');
-}
-
-function openRecurModal(editId) {
-  editId = editId || null;
-  editingRecurId = editId;
-  selectedRecurCategory = null;
-  selectedRecurPerson = 'Welinton';
-
-  // Populate category grid
-  document.getElementById('recurCatGrid').innerHTML = getAllCategories().map(c => `
-    <div class="cat-chip" id="recurChip-${c.id}" onclick="selectRecurCategory('${c.id}')">
-      <span class="cat-icon">${c.icon}</span>
-      <span class="cat-name">${c.label}</span>
-    </div>`).join('');
-
-  document.getElementById('recurModalTitle').textContent = editId ? 'Editar gasto fixo' : 'Novo gasto fixo';
-  document.getElementById('recurSubmitBtn').textContent = editId ? 'Salvar' : 'Salvar gasto fixo';
-
-  if (editId) {
-    const r = recurringExpenses.find(x => x.id === editId);
-    if (r) {
-      selectRecurPerson(r.person);
-      document.getElementById('recurDescInput').value = r.description;
-      document.getElementById('recurAmountInput').value = r.amount.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-      document.getElementById('recurDayInput').value = r.day;
-      selectedRecurCategory = r.category;
-      // Restore duration
-      const dur = r.totalMonths || 0;
-      if ([0,3,6,12].includes(dur)) {
-        selectDuration(dur);
-      } else if (dur > 0) {
-        selectDuration('custom');
-        document.getElementById('recurDurationCustom').value = dur;
-      } else {
-        selectDuration(0);
-      }
-      setTimeout(() => {
-        const chip = document.getElementById(`recurChip-${r.category}`);
-        if (chip) chip.classList.add('selected');
-      }, 50);
-    }
-  } else {
-    document.getElementById('recurDescInput').value = '';
-    document.getElementById('recurAmountInput').value = '';
-    document.getElementById('recurDayInput').value = '';
-    document.getElementById('recurDurationCustom').value = '';
-    selectRecurPerson('Welinton');
-    selectDuration(0);
-  }
-
-  document.getElementById('recurModal').classList.add('open');
-  setTimeout(() => document.getElementById('recurDescInput').focus(), 350);
-}
-function closeRecurModal() { document.getElementById('recurModal').classList.remove('open'); }
-function handleRecurModalClick(e) { if (e.target===e.currentTarget) closeRecurModal(); }
-
-function selectRecurPerson(p) {
-  selectedRecurPerson = p;
-  document.getElementById('recurBtnW').classList.toggle('selected', p==='Welinton');
-  document.getElementById('recurBtnD').classList.toggle('selected', p==='Débora');
-}
-function selectRecurCategory(id) {
-  selectedRecurCategory = id;
-  document.querySelectorAll('[id^="recurChip-"]').forEach(c => c.classList.remove('selected'));
-  document.getElementById(`recurChip-${id}`).classList.add('selected');
-}
-
-function submitRecur() {
-  const desc = document.getElementById('recurDescInput').value.trim();
-  const raw = document.getElementById('recurAmountInput').value.replace(/\./g,'').replace(',','.');
-  const amount = parseFloat(raw) || 0;
-  const day = parseInt(document.getElementById('recurDayInput').value) || 0;
-
-  if (!desc) { showToast('⚠️ Digite uma descrição'); vibrate(100); return; }
-  if (!amount || amount <= 0) { showToast('⚠️ Informe um valor válido'); vibrate(100); return; }
-  if (!selectedRecurCategory) { showToast('⚠️ Selecione uma categoria'); vibrate(100); return; }
-  if (!day || day < 1 || day > 31) { showToast('⚠️ Informe um dia válido (1-31)'); vibrate(100); return; }
-
-  // Resolve duration
-  let totalMonths = 0;
-  if (selectedDuration === 'custom') {
-    totalMonths = parseInt(document.getElementById('recurDurationCustom').value) || 0;
-    if (totalMonths < 1) { showToast('⚠️ Informe a quantidade de meses'); vibrate(100); return; }
-  } else {
-    totalMonths = selectedDuration; // 0 = indeterminate
-  }
-
-  // Compute start and end month
-  const now = new Date();
-  const startMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  let endMonth = null;
-  if (totalMonths > 0) {
-    const endDate = new Date(now.getFullYear(), now.getMonth() + totalMonths - 1, 1);
-    endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}`;
-  }
-
-  const cat = getAllCategories().find(c => c.id === selectedRecurCategory);
-  const recurData = {
-    person: selectedRecurPerson, description: desc, amount,
-    category: selectedRecurCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
-    day, totalMonths, startMonth, endMonth
-  };
-
-  if (editingRecurId) {
-    const idx = recurringExpenses.findIndex(r => r.id === editingRecurId);
-    if (idx !== -1) recurringExpenses[idx] = { ...recurringExpenses[idx], ...recurData };
-  } else {
-    recurringExpenses.push({ id: Date.now().toString(36), launchedCount: 0, ...recurData });
-  }
-  saveRecurring();
-  closeRecurModal();
-  renderRecurList();
-  vibrate(40);
-  const durLabel = totalMonths === 0 ? 'sem data de término' : `por ${totalMonths} mês(es)`;
-  showToast(`🔄 Gasto fixo salvo — ${durLabel}!`);
-  checkAndLaunchRecurring();
-}
-
-function deleteRecur(id) {
-  if (!confirm('Remover este gasto fixo?')) return;
-  recurringExpenses = recurringExpenses.filter(r => r.id !== id);
-  saveRecurring();
-  renderRecurList();
-  vibrate([50,30,50]);
-  showToast('🗑️ Gasto fixo removido');
-}
-
-// ════════════════════════════════════════════════
-// CATEGORY HISTORY
-// ════════════════════════════════════════════════
-function openCatHistory(catId) {
-  const cat = getAllCategories().find(c => c.id === catId);
-  if (!cat) return;
-  const prefix = getViewMonthPrefix();
-  const { year, month } = getViewMonth();
-  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-
-  const filtered = expenses.filter(e => e.category === catId && e.date.startsWith(prefix))
-    .sort((a,b) => b.date.localeCompare(a.date));
-
-  document.getElementById('catHistIcon').textContent = cat.icon;
-  document.getElementById('catHistTitle').textContent = cat.label;
-  document.getElementById('catHistPeriod').textContent = `${months[month-1]}/${year} · ${filtered.length} lançamento(s)`;
-
-  const total = filtered.reduce((s,e) => s+e.amount, 0);
-  document.getElementById('catHistTotal').textContent = fmtCurrency(total);
-  document.getElementById('catHistCount').textContent = filtered.length;
-
-  if (!filtered.length) {
-    document.getElementById('catHistList').innerHTML = '<div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-title">Sem gastos</div><div class="empty-desc">Nenhum lançamento nesta categoria este mês</div></div>';
-  } else {
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now()-86400000).toISOString().split('T')[0];
-    document.getElementById('catHistList').innerHTML = filtered.map(e => {
-      const d = new Date(e.date+'T12:00:00');
-      const label = e.date===today?'Hoje':e.date===yesterday?'Ontem':d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
-      return `<div class="cat-hist-item">
-        <div class="cat-hist-info">
-          <div class="cat-hist-desc">${e.description}</div>
-          <div class="cat-hist-meta">
-            <span class="expense-person-badge ${e.person==='Welinton'?'badge-w':'badge-d'}">${e.person}</span>
-            <span>${label}</span>
-          </div>
-        </div>
-        <div class="cat-hist-amount">-${fmtCurrency(e.amount)}</div>
-      </div>`;
-    }).join('');
-  }
-
-  document.getElementById('catHistModal').classList.add('open');
-}
-function closeCatHistModal() { document.getElementById('catHistModal').classList.remove('open'); }
-function handleCatHistModalClick(e) { if (e.target===e.currentTarget) closeCatHistModal(); }
-
-// ════════════════════════════════════════════════
-// MONTHLY EVOLUTION CHART
-// ════════════════════════════════════════════════
-function renderMonthlyChart() {
-  const chart = document.getElementById('monthlyChart');
-  if (!chart) return;
-
-  const now = new Date();
-  const monthLabels = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-
-  // Last 6 months
-  const months = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({
-      year: d.getFullYear(),
-      month: d.getMonth() + 1,
-      label: monthLabels[d.getMonth()],
-      prefix: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
-      isCurrent: i === 0
-    });
-  }
-
-  const totals = months.map(m => ({
-    ...m,
-    total: expenses.filter(e => e.date.startsWith(m.prefix)).reduce((s,e) => s+e.amount, 0)
-  }));
-
-  const max = Math.max(...totals.map(m => m.total), 1);
-
-  chart.innerHTML = totals.map(m => {
-    const barH = Math.max((m.total / max) * 80, m.total > 0 ? 4 : 0);
-    return `
-    <div class="monthly-col" onclick="jumpToMonth('${m.prefix}')">
-      <div class="monthly-bar-wrap">
-        <div class="monthly-bar ${m.isCurrent ? 'current' : ''}" style="height:${barH}px" title="${fmtCurrency(m.total)}"></div>
-      </div>
-      <div class="monthly-val">${m.total > 0 ? 'R$'+Math.round(m.total/1000)+'k' : '-'}</div>
-      <div class="monthly-label ${m.isCurrent ? 'current' : ''}">${m.label}</div>
-    </div>`;
-  }).join('');
-}
-
-function jumpToMonth(prefix) {
-  const [year, month] = prefix.split('-');
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  currentMonthOffset = (parseInt(year) - currentYear) * 12 + (parseInt(month) - currentMonth);
-  updateMonthLabel();
-  updateHeader();
-  renderExpenses();
-  showScreen('home');
-  showToast(`📅 Exibindo ${prefix}`);
-}
-
 // ── Toast ──
 let toastTimer;
 function showToast(msg) {
@@ -2204,10 +1682,6 @@ window.addEventListener('popstate', function(e) {
   if (delModal && delModal.classList.contains('open')) { closeDelModal(); return; }
   if (catModal && catModal.classList.contains('open')) { closeCatModal(); return; }
   if (catBudgetModal && catBudgetModal.classList.contains('open')) { closeCatBudgetModal(); return; }
-  const catHistModal = document.getElementById('catHistModal');
-  const recurModal = document.getElementById('recurModal');
-  if (catHistModal && catHistModal.classList.contains('open')) { closeCatHistModal(); return; }
-  if (recurModal && recurModal.classList.contains('open')) { closeRecurModal(); return; }
   if (delCatModal && delCatModal.classList.contains('open')) { closeDelCatModal(); return; }
   if (exitModal && exitModal.classList.contains('open')) { closeExitModal(); return; }
 
