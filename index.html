@@ -12,6 +12,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getDatabase, ref, set, get, push, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAV_wJwr42OhIHDc8LAg-XvjBiSQWvETSs",
@@ -25,9 +26,36 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const auth = getAuth(app);
 
-    // Expose Firebase functions globally for use in main script
-    window._fb = { db, ref, set, get, push, remove, onValue, off };
+    // Shared family account credentials
+    const FAMILY_EMAIL = 'familia.gastos.app@gmail.com';
+    const FAMILY_PASSWORD = 'GastosFamilia@2026';
+
+    // Expose Firebase functions globally
+    window._fb = { db, ref, set, get, push, remove, onValue, off, auth };
+
+    // Auto sign-in with family account
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log('Firebase Auth: logged in as', user.email);
+        window._fbAuthenticated = true;
+        if (typeof window.onFirebaseAuthenticated === 'function') {
+          window.onFirebaseAuthenticated();
+        }
+      } else {
+        // Not logged in — sign in automatically
+        signInWithEmailAndPassword(auth, FAMILY_EMAIL, FAMILY_PASSWORD)
+          .then(() => console.log('Firebase Auth: sign in successful'))
+          .catch(err => {
+            console.log('Firebase Auth error:', err.code);
+            // If account doesn't exist yet, notify app to show setup
+            if (typeof window.onFirebaseAuthError === 'function') {
+              window.onFirebaseAuthError(err.code);
+            }
+          });
+      }
+    });
 
     // ── Start Firebase listeners ──
     // Store pending snapshots until main JS is ready
@@ -66,8 +94,15 @@
       });
     }
 
-    startListeners();
-    window.dispatchEvent(new Event('firebase-ready'));
+    // Start listeners only after authentication
+    window.onFirebaseAuthenticated = function() {
+      startListeners();
+      window.dispatchEvent(new Event('firebase-ready'));
+    };
+
+    window.onFirebaseAuthError = function(code) {
+      window.dispatchEvent(new CustomEvent('firebase-auth-error', { detail: code }));
+    };
   </script>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -690,7 +725,11 @@
             </div>
             <div id="fbStatusDot" class="status-dot dot-amber" style="margin-left:auto;flex-shrink:0"></div>
           </div>
-          <p style="font-size:12px;color:var(--text-hint);margin-top:6px;line-height:1.6">Sincronização em tempo real ativa. Os dados são compartilhados instantaneamente entre os celulares.</p>
+          <p style="font-size:12px;color:var(--text-hint);margin-top:6px;line-height:1.6">🔒 Dados protegidos com autenticação. Sincronização em tempo real entre os celulares.</p>
+          <div style="margin-top:10px;padding:10px;background:var(--amber-50);border-radius:8px;display:none" id="authSetupCard">
+            <div style="font-size:13px;font-weight:600;color:var(--amber-700);margin-bottom:6px">⚠️ Autenticação não configurada</div>
+            <div style="font-size:12px;color:var(--amber-700);line-height:1.6">Para ativar a segurança, crie a conta de acesso no Firebase Console:<br>1. Acesse console.firebase.google.com<br>2. Authentication → Primeiros passos → E-mail/senha → Ativar<br>3. Adicionar usuário: <strong>familia.gastos.app@gmail.com</strong><br>Senha: <strong>GastosFamilia@2026</strong></div>
+          </div>
         </div>
       </div>
 
@@ -1150,11 +1189,17 @@ window.onFirebaseExpenses = function(remoteExpenses) {
         document.getElementById('screen-stats').classList.contains('active')) renderStats();
     localStorage.setItem('fin_last_sync', new Date().toISOString());
     updateSyncTime();
+  initNotifications();
     const msgs = [];
     if (added > 0) msgs.push(added + ' novo(s)');
     if (updated > 0) msgs.push(updated + ' atualizado(s)');
     if (removed > 0) msgs.push(removed + ' removido(s)');
     if (msgs.length) showToast('🔄 ' + msgs.join(', '));
+    // Push notification for new expenses from other device
+    if (added > 0 && typeof notifyNewExpense === 'function') {
+      const newExpenses = expenses.slice(0, added);
+      newExpenses.forEach(e => notifyNewExpense(e));
+    }
   }
   updateSyncBadge(true);
 };
@@ -1219,11 +1264,16 @@ window.onFirebaseRecurring = function(data) {
   if (added > 0) showToast('🔄 ' + added + ' gasto(s) fixo(s) recebido(s)!');
 };
 
-// Listen for Firebase ready
+// Listen for Firebase ready (after auth)
 window.addEventListener('firebase-ready', function() {
   fbReady = true;
-  console.log('Firebase conectado!');
+  console.log('Firebase autenticado e conectado!');
   updateSyncBadge(true);
+  // Update Firebase status in config screen
+  const dot = document.getElementById('fbStatusDot');
+  const txt = document.getElementById('fbStatusText');
+  if (dot) dot.className = 'status-dot dot-green';
+  if (txt) txt.textContent = '🔒 Conectado e autenticado';
 
   // Process any data that arrived before main JS was ready
   setTimeout(function() {
@@ -1239,10 +1289,27 @@ window.addEventListener('firebase-ready', function() {
       window.onFirebaseRecurring(window._pendingRecurring);
       window._pendingRecurring = null;
     }
-    // Auto-push local configs
     syncConfig();
     syncRecurring();
   }, 500);
+});
+
+// Handle auth errors
+window.addEventListener('firebase-auth-error', function(e) {
+  const code = e.detail;
+  console.log('Firebase auth error:', code);
+  const txt = document.getElementById('fbStatusText');
+  const dot = document.getElementById('fbStatusDot');
+  if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+    if (txt) txt.textContent = '⚠️ Conta não criada ainda — veja Config';
+    if (dot) dot.className = 'status-dot dot-amber';
+    showToast('⚠️ Configure a autenticação do Firebase');
+    const authCard = document.getElementById('authSetupCard');
+    if (authCard) authCard.style.display = 'block';
+  } else {
+    if (txt) txt.textContent = '❌ Erro de autenticação: ' + code;
+    if (dot) dot.className = 'status-dot dot-red';
+  }
 });
 
 let expenses = [];
@@ -1651,8 +1718,13 @@ function updateHeader() {
              normStr(e.categoryLabel) === normStr(cat.label);
     }).reduce((s,e)=>s+e.amount,0);
     const cp = (cs/cb)*100;
-    if (cp>=100) catAlerts.push(`🚨 <strong>${cat.icon} ${cat.label}</strong>: estourado! (${fmtCurrency(cs)} / ${fmtCurrency(cb)})`);
-    else if (cp>=80) catAlerts.push(`⚠️ <strong>${cat.icon} ${cat.label}</strong>: ${cp.toFixed(0)}% usado`);
+    if (cp>=100) {
+      catAlerts.push(`🚨 <strong>${cat.icon} ${cat.label}</strong>: estourado! (${fmtCurrency(cs)} / ${fmtCurrency(cb)})`);
+      if (typeof notifyBudgetAlert === 'function') notifyBudgetAlert(cat.label, cp, cs, cb);
+    } else if (cp>=80) {
+      catAlerts.push(`⚠️ <strong>${cat.icon} ${cat.label}</strong>: ${cp.toFixed(0)}% usado`);
+      if (typeof notifyBudgetAlert === 'function') notifyBudgetAlert(cat.label, cp, cs, cb);
+    }
   });
 
   // Budget bar
@@ -2998,6 +3070,68 @@ function renderCategoryComparison() {
       <div class="cat-compare-diff ${diffClass}">${diffIcon} ${diffText}</div>
     </div>`;
   }).join('');
+}
+
+// ════════════════════════════════════════════
+// PUSH NOTIFICATIONS
+// ════════════════════════════════════════════
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  const perm = await Notification.requestPermission();
+  return perm === 'granted';
+}
+
+function sendNotification(title, body, icon) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    const notif = new Notification(title, {
+      body: body,
+      icon: icon || 'icons/icon-192.png',
+      badge: 'icons/icon-192.png',
+      vibrate: [200, 100, 200],
+      tag: 'gastos-familia',
+      renotify: true
+    });
+    notif.onclick = function() { window.focus(); notif.close(); };
+    setTimeout(() => notif.close(), 6000);
+  } catch(e) { console.log('Notification error:', e); }
+}
+
+// Ask permission on first load
+function initNotifications() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    // Ask after 3 seconds to not be intrusive
+    setTimeout(async () => {
+      const granted = await requestNotificationPermission();
+      if (granted) showToast('🔔 Notificações ativadas!');
+    }, 3000);
+  }
+}
+
+// Notify when new expenses arrive from Firebase
+function notifyNewExpense(expense) {
+  if (!expense || !expense.person) return;
+  // Don't notify for own expenses
+  sendNotification(
+    `💰 Novo gasto de ${expense.person}`,
+    `${expense.categoryIcon} ${expense.description} — ${fmtCurrency(expense.amount)}`,
+    'icons/icon-192.png'
+  );
+}
+
+// Notify budget alerts
+function notifyBudgetAlert(catLabel, pct, spent, budgetVal) {
+  const isOver = pct >= 100;
+  sendNotification(
+    isOver ? `🚨 Orçamento estourado: ${catLabel}` : `⚠️ Alerta: ${catLabel}`,
+    isOver
+      ? `Você gastou ${fmtCurrency(spent)} de ${fmtCurrency(budgetVal)}`
+      : `${pct.toFixed(0)}% do orçamento usado (${fmtCurrency(spent)} de ${fmtCurrency(budgetVal)})`,
+    'icons/icon-192.png'
+  );
 }
 
 // ── Toast ──
