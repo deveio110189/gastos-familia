@@ -537,6 +537,11 @@
 
     /* ── Variable recurring ── */
     .recur-var-badge { font-size: 10px; background: var(--amber-50); color: var(--amber-700); padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+
+    /* ── Installment badge in expense list ── */
+    .installment-pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: var(--purple-50); color: var(--purple-700); white-space: nowrap; }
+    .future-expense { opacity: 0.7; }
+    .future-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; background: var(--blue-50); color: var(--blue-700); }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -564,7 +569,10 @@
       <span class="app-title">💰 Gastos Família</span>
       <div class="month-nav">
         <button class="month-nav-btn" onclick="changeMonth(-1)">‹</button>
-        <span class="month-label" id="monthLabel"></span>
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:90px">
+          <span class="month-label" id="monthLabel"></span>
+          <span id="monthFutureTag" style="font-size:9px;color:rgba(255,255,255,0.5);display:none">📅 futuro</span>
+        </div>
         <button class="month-nav-btn" onclick="changeMonth(1)">›</button>
       </div>
     </div>
@@ -1481,7 +1489,8 @@ function saveToStorage() { localStorage.setItem('fin_expenses', JSON.stringify(e
 // ── Month navigation ──
 function changeMonth(dir) {
   currentMonthOffset += dir;
-  if (currentMonthOffset > 0) currentMonthOffset = 0; // can't go to future
+  // Allow up to 24 months in the future (for installments)
+  if (currentMonthOffset > 24) currentMonthOffset = 24;
   updateMonthLabel();
   updateHeader();
   renderExpenses();
@@ -1503,6 +1512,8 @@ function updateMonthLabel() {
   const { year, month } = getViewMonth();
   const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   document.getElementById('monthLabel').textContent = `${months[month-1]} ${year}`;
+  const futureTag = document.getElementById('monthFutureTag');
+  if (futureTag) futureTag.style.display = currentMonthOffset > 0 ? 'block' : 'none';
 }
 
 function fmtCurrency(v) {
@@ -2912,12 +2923,14 @@ function jumpToMonth(prefix) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
-  currentMonthOffset = (parseInt(year) - currentYear) * 12 + (parseInt(month) - currentMonth);
+  const offset = (parseInt(year) - currentYear) * 12 + (parseInt(month) - currentMonth);
+  currentMonthOffset = Math.max(-60, Math.min(24, offset));
   updateMonthLabel();
   updateHeader();
   renderExpenses();
   showScreen('home');
-  showToast(`📅 Exibindo ${prefix}`);
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  showToast(`📅 ${months[parseInt(month)-1]}/${year}`);
 }
 
 // ════════════════════════════════════════════
