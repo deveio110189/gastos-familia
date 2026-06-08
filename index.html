@@ -1480,6 +1480,8 @@ function loadFromStorage() {
   const raw = localStorage.getItem('fin_expenses');
   if (raw) {
     expenses = JSON.parse(raw);
+    // Remove any future preview expenses that may have been saved
+    expenses = expenses.filter(e => !e.isFuturePreview);
     // Normalize imported expenses
     expenses = expenses.map(e => normalizeExpenseCategory(e));
   }
@@ -1489,8 +1491,7 @@ function saveToStorage() { localStorage.setItem('fin_expenses', JSON.stringify(e
 // ── Month navigation ──
 function changeMonth(dir) {
   currentMonthOffset += dir;
-  // Allow up to 24 months in the future (for installments)
-  if (currentMonthOffset > 24) currentMonthOffset = 24;
+  if (currentMonthOffset > 0) currentMonthOffset = 0;
   updateMonthLabel();
   updateHeader();
   renderExpenses();
@@ -2032,8 +2033,7 @@ const SYNC_INTERVAL = 60000; // 60 seconds
 // ── Send one expense to Firebase ──
 async function syncExpense(expense, action) {
   if (!expense) return;
-  // Don't sync future preview expenses — they'll be confirmed when month arrives
-  if (expense.isFuturePreview) return;
+
   if (!window._fb) { expense.synced = false; saveToStorage(); return; }
   fbReady = true;
   action = action || 'addExpense';
@@ -2606,17 +2606,11 @@ function checkAndLaunchRecurring() {
     // Only launch from startMonth onwards — never in past months before creation
     if (recur.startMonth && currentMonth < recur.startMonth) return;
 
-    // Check if already launched this month (real, not preview)
+    // Check if already launched this month
     const alreadyLaunched = expenses.some(e =>
-      e.recurringId === recur.id && e.date.startsWith(currentMonth) && !e.isFuturePreview
+      e.recurringId === recur.id && e.date.startsWith(currentMonth)
     );
     if (alreadyLaunched) return;
-
-    // Remove future preview for this month if exists
-    const previewIdx = expenses.findIndex(e =>
-      e.recurringId === recur.id && e.date.startsWith(currentMonth) && e.isFuturePreview
-    );
-    if (previewIdx !== -1) expenses.splice(previewIdx, 1);
 
     // Check if today is on or past the due day this month
     const dueDay = parseInt(recur.day);
@@ -2661,49 +2655,8 @@ function checkAndLaunchRecurring() {
   if (changed) saveRecurring();
   localStorage.setItem('fin_recur_lastcheck', todayStr);
 
-  // Pre-create future recurring expenses (next 24 months) for visibility
-  recurringExpenses.forEach(recur => {
-    for (let i = 1; i <= 24; i++) {
-      const futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
-      const futureMonth = `${futureDate.getFullYear()}-${String(futureDate.getMonth()+1).padStart(2,'0')}`;
-
-      // Stop if beyond endMonth
-      if (recur.endMonth && futureMonth > recur.endMonth) break;
-      // Skip if before startMonth
-      if (recur.startMonth && futureMonth < recur.startMonth) continue;
-
-      const alreadyExists = expenses.some(e =>
-        e.recurringId === recur.id && e.date.startsWith(futureMonth)
-      );
-      if (alreadyExists) continue;
-
-      const dueDay = parseInt(recur.day);
-      const daysInMonth = new Date(futureDate.getFullYear(), futureDate.getMonth()+1, 0).getDate();
-      const actualDay = Math.min(dueDay, daysInMonth);
-      const dueDate = `${futureMonth}-${String(actualDay).padStart(2,'0')}`;
-
-      // Create as a preview (not synced, marked as future/pending)
-      const futureExpense = {
-        id: 'recur_' + recur.id + '_' + futureMonth,
-        recurringId: recur.id,
-        person: recur.person,
-        amount: recur.amount,
-        category: recur.category,
-        categoryLabel: recur.categoryLabel,
-        categoryIcon: recur.categoryIcon,
-        description: recur.description + ' (fixo)',
-        date: dueDate,
-        createdAt: new Date().toISOString(),
-        synced: false,
-        isRecurring: true,
-        isFuturePreview: true // mark as preview — will be confirmed when month arrives
-      };
-      expenses.push(futureExpense);
-      changed = true;
-    }
-  });
-
-  if (changed) { saveToStorage(); }
+  if (changed) saveRecurring();
+  localStorage.setItem('fin_recur_lastcheck', todayStr);
   updateHeader();
   renderExpenses();
 }
@@ -2977,7 +2930,7 @@ function jumpToMonth(prefix) {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
   const offset = (parseInt(year) - currentYear) * 12 + (parseInt(month) - currentMonth);
-  currentMonthOffset = Math.max(-60, Math.min(24, offset));
+  currentMonthOffset = Math.max(-60, Math.min(0, offset));
   updateMonthLabel();
   updateHeader();
   renderExpenses();
