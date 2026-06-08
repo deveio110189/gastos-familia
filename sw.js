@@ -1,5 +1,5 @@
 // Atualizar este número força todos os celulares a baixar a versão nova
-const CACHE = 'gastos-familia-v3';
+const CACHE = 'gastos-familia-v5';
 const ASSETS = [
   '/gastos-familia/',
   '/gastos-familia/index.html',
