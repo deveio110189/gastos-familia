@@ -575,12 +575,12 @@
         <div class="header-box-sub" id="headerBudgetSub">do mês</div>
       </div>
       <div class="header-box">
-        <div class="header-box-label">📊 Gasto</div>
+        <div class="header-box-label">📊 Valor Gasto no Mês</div>
         <div class="header-box-value" id="totalAmount">R$ 0,00</div>
         <div class="header-box-sub" id="headerSpentSub">do mês</div>
       </div>
       <div class="header-box header-box-remaining">
-        <div class="header-box-label">🏦 Saldo</div>
+        <div class="header-box-label">🏦 Saldo Restante</div>
         <div class="header-box-value" id="headerRemaining">R$ 0,00</div>
         <div class="header-box-sub" id="headerRemainingSub">disponível</div>
       </div>
@@ -778,16 +778,9 @@
     <!-- Config -->
     <div class="screen" id="screen-config">
       <div class="config-section">
-        <div class="config-section-title">Orçamento e metas</div>
+        <div class="config-section-title">Meta de economia</div>
         <div class="card">
-          <div class="form-group">
-            <label class="form-label">Limite de gastos (R$)</label>
-            <div class="amount-input-wrap">
-              <span class="currency-prefix">R$</span>
-              <input type="number" class="amount-input" id="budgetInput" placeholder="0,00" step="0.01" min="0" inputmode="decimal" style="font-size:22px; padding: 10px 0;" />
-            </div>
-            <p style="font-size:12px;color:var(--text-hint);margin-top:6px">Deixe em branco para desativar o controle de orçamento</p>
-          </div>
+
           <div class="form-group">
             <label class="form-label">Meta de economia mensal (R$)</label>
             <div class="amount-input-wrap">
@@ -796,7 +789,7 @@
             </div>
             <p style="font-size:12px;color:var(--text-hint);margin-top:6px">Quanto quer guardar todo mês. O app mostra quanto ainda pode gastar.</p>
           </div>
-          <button class="btn-primary" onclick="saveBudget()">Salvar orçamento e meta</button>
+          <button class="btn-primary" onclick="saveBudget()">Salvar meta de economia</button>
         </div>
       </div>
 
@@ -1794,7 +1787,7 @@ function updateHeader() {
   document.getElementById('tabW').textContent = fmtCurrency(wTotal);
   document.getElementById('tabD').textContent = fmtCurrency(dTotal);
 
-  // Header boxes — orçamento total das categorias
+  // Header boxes — soma dos orçamentos definidos por categoria
   const totalCatBudget = Object.values(categoryBudgets).reduce((s,v) => s+v, 0);
   const hBudget = document.getElementById('headerBudget');
   const hBudgetSub = document.getElementById('headerBudgetSub');
@@ -1803,13 +1796,16 @@ function updateHeader() {
   const hRemainingSub = document.getElementById('headerRemainingSub');
 
   if (totalCatBudget > 0) {
+    // Orçamento = soma de todos os orçamentos por categoria
     hBudget.textContent = fmtCurrency(totalCatBudget);
-    hBudgetSub.textContent = 'definido';
+    hBudgetSub.textContent = 'soma das categorias';
     hBudget.className = 'header-box-value';
-    const spentPct = ((total/totalCatBudget)*100).toFixed(0);
-    hSpentSub.textContent = `${spentPct}% usado`;
 
-    // Remaining box
+    // % usado
+    const spentPct = ((total / totalCatBudget) * 100).toFixed(0);
+    hSpentSub.textContent = `${spentPct}% do orçamento`;
+
+    // Saldo restante = orçamento total - total gasto
     const remaining = totalCatBudget - total;
     hRemaining.textContent = fmtCurrency(Math.abs(remaining));
     if (remaining >= 0) {
@@ -1822,8 +1818,8 @@ function updateHeader() {
   } else {
     hBudget.textContent = 'R$ 0,00';
     hBudget.className = 'header-box-value';
-    hBudgetSub.textContent = 'sem limite';
-    hSpentSub.textContent = 'do mês';
+    hBudgetSub.textContent = 'defina nas categorias';
+    hSpentSub.textContent = 'no mês';
     hRemaining.textContent = '—';
     hRemaining.className = 'header-box-value';
     hRemainingSub.textContent = 'sem orçamento';
@@ -1856,15 +1852,19 @@ function updateHeader() {
   const alertWrap = document.getElementById('budgetAlertWrap');
   const allAlerts = [];
 
-  if (budget > 0) {
-    const pct = Math.min((total / budget) * 100, 100);
+  // Budget bar now uses sum of category budgets
+  if (totalCatBudget > 0) {
+    const pct = Math.min((total / totalCatBudget) * 100, 100);
     const fill = document.getElementById('budgetBarFill');
-    fill.style.width = pct.toFixed(1) + '%';
-    fill.className = 'budget-bar-fill' + (pct >= 100 ? ' over' : pct >= 80 ? ' warn' : '');
-    document.getElementById('budgetInfo').textContent = `${fmtCurrency(total)} de ${fmtCurrency(budget)} (${pct.toFixed(0)}%)`;
+    if (fill) {
+      fill.style.width = pct.toFixed(1) + '%';
+      fill.className = 'budget-bar-fill' + (pct >= 100 ? ' over' : pct >= 80 ? ' warn' : '');
+    }
+    const budgetInfo = document.getElementById('budgetInfo');
+    if (budgetInfo) budgetInfo.textContent = `${fmtCurrency(total)} de ${fmtCurrency(totalCatBudget)} (${pct.toFixed(0)}%)`;
     wrap.style.display = 'block';
-    if (pct >= 100) allAlerts.push(`<div class="budget-alert over">🚨 Orçamento geral estourado! Você gastou ${fmtCurrency(total - budget)} a mais.</div>`);
-    else if (pct >= 80) allAlerts.push(`<div class="budget-alert warn">⚠️ Você já usou ${pct.toFixed(0)}% do orçamento geral.</div>`);
+    if (pct >= 100) allAlerts.push(`<div class="budget-alert over">🚨 Orçamento estourado! Você gastou ${fmtCurrency(total - totalCatBudget)} a mais.</div>`);
+    else if (pct >= 80) allAlerts.push(`<div class="budget-alert warn">⚠️ Você já usou ${pct.toFixed(0)}% do orçamento total.</div>`);
   } else {
     wrap.style.display = 'none';
   }
@@ -1996,9 +1996,9 @@ function renderPie(wTotal, dTotal) {
 
 // ── Budget ──
 function saveBudget() {
-  const val = parseFloat(document.getElementById('budgetInput').value) || 0;
-  budget = val;
-  localStorage.setItem('fin_budget', val.toString());
+  // Budget is now the sum of category budgets — no global limit needed
+  budget = 0;
+  localStorage.removeItem('fin_budget');
 
   // Save savings goal
   const goalVal = parseFloat(document.getElementById('savingsGoalInput').value) || 0;
@@ -2007,7 +2007,7 @@ function saveBudget() {
 
   updateHeader();
   updateSavingsGoal();
-  showToast(val > 0 ? `✅ Orçamento e meta salvos!` : '✅ Configurações salvas!');
+  showToast('✅ Meta de economia salva!');
   syncConfig();
 }
 
