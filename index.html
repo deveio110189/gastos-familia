@@ -498,6 +498,45 @@
     .quick-cat-btn { display: flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface-raised); cursor: pointer; font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text-muted); transition: all 0.15s; }
     .quick-cat-btn.selected { border-color: var(--green-500); background: var(--green-50); color: var(--green-900); }
     .quick-cat-btn:active { transform: scale(0.95); }
+
+    /* ── Search bar ── */
+    .search-wrap { position: relative; margin-bottom: 12px; }
+    .search-input { width: 100%; padding: 10px 14px 10px 36px; border: 1.5px solid var(--border-strong); border-radius: 20px; background: var(--surface); font-family: var(--font); font-size: 14px; color: var(--text); outline: none; transition: border-color 0.15s; box-sizing: border-box; }
+    .search-input:focus { border-color: var(--green-500); }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 15px; pointer-events: none; }
+    .search-clear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 16px; cursor: pointer; color: var(--text-hint); display: none; }
+
+    /* ── Savings goal ── */
+    .goal-bar-track { height: 8px; background: var(--gray-100); border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
+    .goal-bar-fill { height: 100%; border-radius: 4px; background: var(--green-500); transition: width 0.4s; }
+    .goal-bar-fill.warn { background: var(--amber-500); }
+    .goal-bar-fill.over { background: var(--red-500); }
+    .goal-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
+    .goal-row { display: flex; justify-content: space-between; align-items: center; }
+    .goal-label { font-size: 11px; font-weight: 600; color: var(--text-hint); text-transform: uppercase; letter-spacing: 0.06em; }
+    .goal-value { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+    .goal-value.green { color: var(--green-700); }
+    .goal-value.red { color: var(--red-700); }
+    .goal-sub { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
+
+    /* ── Annual summary ── */
+    .annual-month-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+    .annual-month-row:last-child { border-bottom: none; }
+    .annual-month-row:active { background: var(--surface-raised); }
+    .annual-month-label { font-size: 13px; font-weight: 600; width: 50px; flex-shrink: 0; }
+    .annual-month-bar-wrap { flex: 1; }
+    .annual-month-bar-track { height: 6px; background: var(--gray-100); border-radius: 3px; overflow: hidden; }
+    .annual-month-bar-fill { height: 100%; border-radius: 3px; background: var(--green-500); transition: width 0.4s; }
+    .annual-month-bar-fill.current { background: var(--green-700); }
+    .annual-month-amount { font-size: 12px; font-family: var(--mono); color: var(--text-muted); width: 70px; text-align: right; flex-shrink: 0; }
+    .annual-total { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-top: 8px; text-align: right; }
+    .year-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .year-nav-btn { background: var(--gray-100); border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+    .year-nav-btn:active { background: var(--gray-200); }
+    .year-label { font-size: 15px; font-weight: 700; flex: 1; text-align: center; }
+
+    /* ── Variable recurring ── */
+    .recur-var-badge { font-size: 10px; background: var(--amber-50); color: var(--amber-700); padding: 2px 7px; border-radius: 10px; font-weight: 600; }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -575,6 +614,34 @@
         <button id="alertToggleBtn" onclick="toggleAlerts()" style="display:none;background:none;border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;color:var(--amber-700);background:var(--amber-50);border:1px solid var(--amber-200)"></button>
       </div>
       <div id="budgetAlertWrap" style="display:none"></div>
+
+      <!-- Savings Goal Card -->
+      <div id="savingsGoalCard" style="display:none" class="goal-card">
+        <div class="goal-row">
+          <div>
+            <div class="goal-label">🎯 Meta de economia</div>
+            <div class="goal-value" id="goalRemaining">R$ 0,00</div>
+            <div class="goal-sub" id="goalSub">disponível para gastar</div>
+          </div>
+          <div style="text-align:right">
+            <div class="goal-label">Economizado</div>
+            <div class="goal-value green" id="goalSaved">R$ 0,00</div>
+            <div class="goal-sub" id="goalPct">0% da meta</div>
+          </div>
+        </div>
+        <div class="goal-bar-track">
+          <div class="goal-bar-fill" id="goalBarFill" style="width:0%"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-hint)" id="goalInfo"></div>
+      </div>
+
+      <!-- Search bar -->
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" id="searchInput" placeholder="Buscar gastos..." oninput="onSearchInput()" />
+        <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+      </div>
+
       <div id="expenseList"></div>
     </div>
 
@@ -675,6 +742,17 @@
         <button class="btn-secondary" onclick="exportToSheets()" style="margin-bottom:0">📊 Enviar ao Google Sheets</button>
       </div>
 
+      <!-- Annual Summary -->
+      <div class="card">
+        <div class="card-title">Resumo anual</div>
+        <div class="year-nav">
+          <button class="year-nav-btn" onclick="changeYear(-1)">‹</button>
+          <div class="year-label" id="yearLabel">2026</div>
+          <button class="year-nav-btn" onclick="changeYear(1)">›</button>
+        </div>
+        <div id="annualSummary"></div>
+      </div>
+
       <!-- Inline report result -->
       <div id="reportResult" style="display:none">
         <div class="card">
@@ -700,7 +778,7 @@
     <!-- Config -->
     <div class="screen" id="screen-config">
       <div class="config-section">
-        <div class="config-section-title">Orçamento mensal</div>
+        <div class="config-section-title">Orçamento e metas</div>
         <div class="card">
           <div class="form-group">
             <label class="form-label">Limite de gastos (R$)</label>
@@ -710,7 +788,15 @@
             </div>
             <p style="font-size:12px;color:var(--text-hint);margin-top:6px">Deixe em branco para desativar o controle de orçamento</p>
           </div>
-          <button class="btn-primary" onclick="saveBudget()">Salvar orçamento</button>
+          <div class="form-group">
+            <label class="form-label">Meta de economia mensal (R$)</label>
+            <div class="amount-input-wrap">
+              <span class="currency-prefix">R$</span>
+              <input type="number" class="amount-input" id="savingsGoalInput" placeholder="0,00" step="0.01" min="0" inputmode="decimal" style="font-size:22px; padding: 10px 0;" />
+            </div>
+            <p style="font-size:12px;color:var(--text-hint);margin-top:6px">Quanto quer guardar todo mês. O app mostra quanto ainda pode gastar.</p>
+          </div>
+          <button class="btn-primary" onclick="saveBudget()">Salvar orçamento e meta</button>
         </div>
       </div>
 
@@ -924,6 +1010,13 @@
           <span class="currency-prefix">R$</span>
           <input type="text" class="amount-input" id="recurAmountInput" placeholder="0,00" inputmode="numeric" />
         </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+          <div class="installment-toggle" id="recurVarToggle" onclick="toggleRecurVar()" style="padding:8px 12px;flex:1">
+            <span style="font-size:16px">📝</span>
+            <span class="installment-toggle-label" style="font-size:13px">Valor variável a cada mês</span>
+          </div>
+        </div>
+        <p id="recurVarHint" style="font-size:12px;color:var(--text-hint);margin-top:6px;display:none">💡 O valor acima é o padrão. Você poderá editar antes de cada lançamento automático.</p>
       </div>
 
       <div class="form-group">
@@ -1378,6 +1471,8 @@ function init() {
     budget = parseFloat(savedBudget) || 0;
     document.getElementById('budgetInput').value = budget > 0 ? budget.toFixed(2) : '';
   }
+  loadSavingsGoal();
+  currentYear = new Date().getFullYear();
 }
 
 function loadFromStorage() {
@@ -1641,6 +1736,15 @@ function renderExpenses() {
   const prefix = getViewMonthPrefix();
   let filtered = expenses.filter(e => e.date.startsWith(prefix));
   if (filterPerson_ !== 'Todos') filtered = filtered.filter(e => e.person === filterPerson_);
+  // Search filter
+  if (searchQuery) {
+    filtered = filtered.filter(e =>
+      (e.description || '').toLowerCase().includes(searchQuery) ||
+      (e.categoryLabel || '').toLowerCase().includes(searchQuery) ||
+      (e.person || '').toLowerCase().includes(searchQuery) ||
+      String(e.amount).includes(searchQuery)
+    );
+  }
 
   if (filtered.length === 0) {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-title">Nenhum gasto ainda</div><div class="empty-desc">Toque no + para adicionar seu primeiro lançamento</div></div>`;
@@ -1767,6 +1871,7 @@ function updateHeader() {
 
   catAlerts.forEach(a => allAlerts.push(`<div class="budget-alert warn">${a}</div>`));
   updateAlertButton(allAlerts);
+  updateSavingsGoal();
 }
 
 // ── Alert toggle ──
@@ -1824,6 +1929,8 @@ function renderStats() {
 
   // Category comparison
   renderCategoryComparison();
+  // Annual summary
+  renderAnnualSummary();
 
   // Bar chart
   const cats = {};
@@ -1892,8 +1999,15 @@ function saveBudget() {
   const val = parseFloat(document.getElementById('budgetInput').value) || 0;
   budget = val;
   localStorage.setItem('fin_budget', val.toString());
+
+  // Save savings goal
+  const goalVal = parseFloat(document.getElementById('savingsGoalInput').value) || 0;
+  savingsGoal = goalVal;
+  localStorage.setItem('fin_savings_goal', goalVal.toString());
+
   updateHeader();
-  showToast(val > 0 ? `✅ Orçamento de ${fmtCurrency(val)} salvo!` : '✅ Orçamento desativado');
+  updateSavingsGoal();
+  showToast(val > 0 ? `✅ Orçamento e meta salvos!` : '✅ Configurações salvas!');
   syncConfig();
 }
 
@@ -2515,7 +2629,12 @@ function checkAndLaunchRecurring() {
       const progLabel = recur.totalMonths > 0
         ? ` (${recur.launchedCount}/${recur.totalMonths})`
         : '';
-      showToast(`🔄 ${recur.categoryIcon} "${recur.description}"${progLabel} lançado!`);
+      if (recur.varAmount) {
+        showToast(`📝 "${recur.description}" — edite o valor antes de confirmar!`);
+        setTimeout(() => openAddModal(expense.id), 500);
+      } else {
+        showToast(`🔄 ${recur.categoryIcon} "${recur.description}"${progLabel} lançado!`);
+      }
     }
   });
 
@@ -2541,6 +2660,7 @@ function renderRecurList() {
         <div class="recur-meta">
           <span class="expense-person-badge ${r.person==='Welinton'?'badge-w':'badge-d'}">${r.person}</span>
           <span>${r.categoryLabel} · dia ${r.day}</span>
+          ${r.varAmount ? '<span class="recur-var-badge">valor variável</span>' : ''}
         </div>
         ${r.totalMonths > 0 ? `
         <div class="recur-progress">
@@ -2606,6 +2726,11 @@ function openRecurModal(editId) {
     document.getElementById('recurDurationCustom').value = '';
     selectRecurPerson('Welinton');
     selectDuration(0);
+    recurVarActive = false;
+    const vt = document.getElementById('recurVarToggle');
+    const vh = document.getElementById('recurVarHint');
+    if (vt) vt.classList.remove('active');
+    if (vh) vh.style.display = 'none';
   }
 
   document.getElementById('recurModal').classList.add('open');
@@ -2658,7 +2783,8 @@ function submitRecur() {
   const recurData = {
     person: selectedRecurPerson, description: desc, amount,
     category: selectedRecurCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
-    day, totalMonths, startMonth, endMonth
+    day, totalMonths, startMonth, endMonth,
+    varAmount: recurVarActive
   };
 
   if (editingRecurId) {
@@ -3181,6 +3307,147 @@ function notifyBudgetAlert(catLabel, pct, spent, budgetVal) {
       : `${pct.toFixed(0)}% do orçamento usado (${fmtCurrency(spent)} de ${fmtCurrency(budgetVal)})`,
     'icons/icon-192.png'
   );
+}
+
+// ════════════════════════════════════════════
+// SEARCH
+// ════════════════════════════════════════════
+let searchQuery = '';
+
+function onSearchInput() {
+  const inp = document.getElementById('searchInput');
+  const clr = document.getElementById('searchClear');
+  searchQuery = inp ? inp.value.trim().toLowerCase() : '';
+  if (clr) clr.style.display = searchQuery ? 'block' : 'none';
+  renderExpenses();
+}
+
+function clearSearch() {
+  const inp = document.getElementById('searchInput');
+  if (inp) inp.value = '';
+  searchQuery = '';
+  const clr = document.getElementById('searchClear');
+  if (clr) clr.style.display = 'none';
+  renderExpenses();
+}
+
+// ════════════════════════════════════════════
+// SAVINGS GOAL
+// ════════════════════════════════════════════
+let savingsGoal = 0;
+
+function loadSavingsGoal() {
+  const s = localStorage.getItem('fin_savings_goal');
+  if (s) {
+    savingsGoal = parseFloat(s) || 0;
+    const inp = document.getElementById('savingsGoalInput');
+    if (inp && savingsGoal > 0) inp.value = savingsGoal.toFixed(2);
+  }
+}
+
+function updateSavingsGoal() {
+  const card = document.getElementById('savingsGoalCard');
+  if (!card) return;
+  if (savingsGoal <= 0) { card.style.display = 'none'; return; }
+
+  const prefix = getViewMonthPrefix();
+  const totalSpent = expenses.filter(e => e.date.startsWith(prefix)).reduce((s,e) => s+e.amount, 0);
+  const totalBudget = Object.values(categoryBudgets).reduce((s,v) => s+v, 0) || budget;
+  const canSpend = totalBudget > 0 ? totalBudget - savingsGoal : 0;
+  const remaining = canSpend - totalSpent;
+  const saved = Math.max(0, canSpend - totalSpent);
+  const pct = savingsGoal > 0 ? Math.min((saved / savingsGoal) * 100, 100) : 0;
+
+  card.style.display = 'block';
+  const remainEl = document.getElementById('goalRemaining');
+  const savedEl = document.getElementById('goalSaved');
+  const pctEl = document.getElementById('goalPct');
+  const fillEl = document.getElementById('goalBarFill');
+  const infoEl = document.getElementById('goalInfo');
+  const subEl = document.getElementById('goalSub');
+
+  if (remaining >= 0) {
+    remainEl.textContent = fmtCurrency(remaining);
+    remainEl.className = 'goal-value green';
+    subEl.textContent = 'pode ainda gastar';
+    if (fillEl) { fillEl.style.width = pct.toFixed(1) + '%'; fillEl.className = 'goal-bar-fill'; }
+  } else {
+    remainEl.textContent = fmtCurrency(Math.abs(remaining));
+    remainEl.className = 'goal-value red';
+    subEl.textContent = 'excedeu o limite para economizar';
+    if (fillEl) { fillEl.style.width = '100%'; fillEl.className = 'goal-bar-fill over'; }
+  }
+
+  savedEl.textContent = fmtCurrency(saved);
+  pctEl.textContent = `${pct.toFixed(0)}% da meta`;
+  if (infoEl) infoEl.textContent = `Meta: ${fmtCurrency(savingsGoal)} · Orçamento disponível: ${fmtCurrency(canSpend)}`;
+}
+
+// ════════════════════════════════════════════
+// ANNUAL SUMMARY
+// ════════════════════════════════════════════
+let currentYear = new Date().getFullYear();
+
+function changeYear(dir) {
+  currentYear += dir;
+  if (currentYear > new Date().getFullYear()) currentYear = new Date().getFullYear();
+  renderAnnualSummary();
+}
+
+function renderAnnualSummary() {
+  const el = document.getElementById('annualSummary');
+  const yearEl = document.getElementById('yearLabel');
+  if (!el) return;
+  if (yearEl) yearEl.textContent = currentYear;
+
+  const monthLabels = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const currentMonthNum = new Date().getMonth() + 1;
+  const thisYear = new Date().getFullYear();
+
+  const monthData = monthLabels.map((label, i) => {
+    const month = i + 1;
+    const prefix = `${currentYear}-${String(month).padStart(2,'0')}`;
+    const total = expenses.filter(e => e.date.startsWith(prefix)).reduce((s,e) => s+e.amount, 0);
+    const isCurrent = currentYear === thisYear && month === currentMonthNum;
+    const isFuture = currentYear === thisYear && month > currentMonthNum;
+    return { label, month, prefix, total, isCurrent, isFuture };
+  }).filter(m => !m.isFuture || m.total > 0);
+
+  const maxTotal = Math.max(...monthData.map(m => m.total), 1);
+  const yearTotal = monthData.reduce((s,m) => s+m.total, 0);
+  const yearAvg = monthData.filter(m => m.total > 0).length > 0
+    ? yearTotal / monthData.filter(m => m.total > 0).length : 0;
+
+  if (!monthData.some(m => m.total > 0)) {
+    el.innerHTML = '<p style="font-size:13px;color:var(--text-hint);text-align:center;padding:16px 0">Sem dados em ' + currentYear + '</p>';
+    return;
+  }
+
+  el.innerHTML = monthData.map(m => `
+    <div class="annual-month-row" onclick="jumpToMonth('${m.prefix}')">
+      <div class="annual-month-label ${m.isCurrent ? 'current' : ''}" style="${m.isCurrent ? 'color:var(--green-700)' : ''}">${m.label}</div>
+      <div class="annual-month-bar-wrap">
+        <div class="annual-month-bar-track">
+          <div class="annual-month-bar-fill ${m.isCurrent ? 'current' : ''}" style="width:${m.total > 0 ? (m.total/maxTotal*100).toFixed(1) : 0}%"></div>
+        </div>
+      </div>
+      <div class="annual-month-amount">${m.total > 0 ? fmtCurrency(m.total) : '—'}</div>
+    </div>`).join('') +
+    `<div class="annual-total">Total ${currentYear}: ${fmtCurrency(yearTotal)} · Média: ${fmtCurrency(yearAvg)}/mês</div>`;
+}
+
+// ════════════════════════════════════════════
+// VARIABLE RECURRING
+// ════════════════════════════════════════════
+let recurVarActive = false;
+
+function toggleRecurVar() {
+  recurVarActive = !recurVarActive;
+  const toggle = document.getElementById('recurVarToggle');
+  const hint = document.getElementById('recurVarHint');
+  if (toggle) toggle.classList.toggle('active', recurVarActive);
+  if (hint) hint.style.display = recurVarActive ? 'block' : 'none';
+  vibrate(20);
 }
 
 // ── Toast ──
