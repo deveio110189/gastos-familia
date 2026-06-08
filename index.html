@@ -746,6 +746,25 @@
       </div>
 
       <div class="config-section">
+        <div class="config-section-title">Notificações</div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:10px;padding:6px 0">
+            <span style="font-size:24px">🔔</span>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600">Notificações push</div>
+              <div style="font-size:12px;color:var(--text-hint)" id="notifStatusText">Verificando...</div>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="enableNotifications()" id="notifBtn" style="margin-top:10px">
+            🔔 Ativar notificações
+          </button>
+          <p style="font-size:12px;color:var(--text-hint);margin-top:8px;line-height:1.6">
+            Receba alertas quando a Débora lançar um gasto ou quando o orçamento estiver próximo do limite.
+          </p>
+        </div>
+      </div>
+
+      <div class="config-section">
         <div class="config-section-title">Sincronização</div>
         <div class="config-row" onclick="testConnection()">
           <span class="config-row-label">Testar conexão</span>
@@ -1431,6 +1450,7 @@ function showScreen(name) {
   if (name === 'stats') { renderStats(); renderMonthlyChart(); }
   if (name === 'cats') renderCatScreen();
   if (name === 'recur') renderRecurList();
+  if (name === 'config') updateNotifStatus();
 }
 
 // ── Person filter ──
@@ -3102,12 +3122,41 @@ function sendNotification(title, body, icon) {
 // Ask permission on first load
 function initNotifications() {
   if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    // Ask after 3 seconds to not be intrusive
-    setTimeout(async () => {
-      const granted = await requestNotificationPermission();
-      if (granted) showToast('🔔 Notificações ativadas!');
-    }, 3000);
+  updateNotifStatus();
+}
+
+function updateNotifStatus() {
+  const btn = document.getElementById('notifBtn');
+  const txt = document.getElementById('notifStatusText');
+  if (!('Notification' in window)) {
+    if (txt) txt.textContent = 'Não suportado neste dispositivo';
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    if (txt) txt.textContent = '✅ Ativas — você receberá alertas';
+    if (btn) { btn.textContent = '✅ Notificações ativas'; btn.style.background = 'var(--green-700)'; }
+  } else if (Notification.permission === 'denied') {
+    if (txt) txt.textContent = '❌ Bloqueadas — ative nas configurações do celular';
+    if (btn) { btn.textContent = '⚙️ Abrir configurações'; btn.onclick = () => showToast('Vá em Configurações → Apps → Gastos Família → Notificações'); }
+  } else {
+    if (txt) txt.textContent = 'Toque no botão para ativar';
+    if (btn) btn.textContent = '🔔 Ativar notificações';
+  }
+}
+
+async function enableNotifications() {
+  if (!('Notification' in window)) { showToast('⚠️ Notificações não suportadas'); return; }
+  if (Notification.permission === 'granted') { showToast('✅ Notificações já estão ativas!'); return; }
+  const granted = await requestNotificationPermission();
+  updateNotifStatus();
+  if (granted) {
+    showToast('🔔 Notificações ativadas!');
+    vibrate(40);
+    // Send test notification
+    setTimeout(() => sendNotification('🎉 Notificações ativas!', 'Você receberá alertas de novos gastos e orçamentos.'), 1000);
+  } else {
+    showToast('❌ Permissão negada — ative nas configurações do celular');
   }
 }
 
