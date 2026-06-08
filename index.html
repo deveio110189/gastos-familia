@@ -30,13 +30,21 @@
     window._fb = { db, ref, set, get, push, remove, onValue, off };
 
     // ── Start Firebase listeners ──
+    // Store pending snapshots until main JS is ready
+    window._pendingExpenses = null;
+    window._pendingConfig = null;
+    window._pendingRecurring = null;
+
     function startListeners() {
-      // Expenses listener
+      // Expenses listener — fires immediately with current data, then on every change
       onValue(ref(db, 'expenses'), (snapshot) => {
         const data = snapshot.val();
         const remoteExpenses = data ? Object.values(data).filter(e => e && e.id) : [];
         if (typeof window.onFirebaseExpenses === 'function') {
           window.onFirebaseExpenses(remoteExpenses);
+        } else {
+          // Main JS not ready yet — store for later
+          window._pendingExpenses = remoteExpenses;
         }
         if (typeof window.updateSyncBadge === 'function') window.updateSyncBadge(true);
       });
@@ -44,13 +52,17 @@
       // Config listener
       onValue(ref(db, 'config/app'), (snapshot) => {
         const data = snapshot.val();
-        if (data && typeof window.onFirebaseConfig === 'function') window.onFirebaseConfig(data);
+        if (!data) return;
+        if (typeof window.onFirebaseConfig === 'function') window.onFirebaseConfig(data);
+        else window._pendingConfig = data;
       });
 
       // Recurring listener
       onValue(ref(db, 'config/recurring'), (snapshot) => {
         const data = snapshot.val();
-        if (data && typeof window.onFirebaseRecurring === 'function') window.onFirebaseRecurring(data);
+        if (!data) return;
+        if (typeof window.onFirebaseRecurring === 'function') window.onFirebaseRecurring(data);
+        else window._pendingRecurring = data;
       });
     }
 
@@ -1212,8 +1224,25 @@ window.addEventListener('firebase-ready', function() {
   fbReady = true;
   console.log('Firebase conectado!');
   updateSyncBadge(true);
-  // Auto-push configs after 2s
-  setTimeout(function() { syncConfig(); syncRecurring(); }, 2000);
+
+  // Process any data that arrived before main JS was ready
+  setTimeout(function() {
+    if (window._pendingExpenses) {
+      window.onFirebaseExpenses(window._pendingExpenses);
+      window._pendingExpenses = null;
+    }
+    if (window._pendingConfig) {
+      window.onFirebaseConfig(window._pendingConfig);
+      window._pendingConfig = null;
+    }
+    if (window._pendingRecurring) {
+      window.onFirebaseRecurring(window._pendingRecurring);
+      window._pendingRecurring = null;
+    }
+    // Auto-push local configs
+    syncConfig();
+    syncRecurring();
+  }, 500);
 });
 
 let expenses = [];
