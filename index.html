@@ -1102,6 +1102,120 @@ const CATEGORIES = [
 
 const PIE_COLORS = ['#1D9E75','#378ADD','#EF9F27','#E24B4A','#7F77DD','#D85A30','#0F6E56','#BA7517'];
 
+// ════════════════════════════════════════════
+// FIREBASE HELPERS
+// ════════════════════════════════════════════
+let fbReady = false;
+function getFB() { return window._fb; }
+
+// Bridge: called by Firebase module when expenses update
+window.onFirebaseExpenses = function(remoteExpenses) {
+  let added = 0, updated = 0, removed = 0;
+  remoteExpenses.forEach(function(remote) {
+    if (!remote.id) return;
+    remote = normalizeExpenseCategory({ ...remote });
+    const idx = expenses.findIndex(function(e) { return e.id === remote.id; });
+    if (idx === -1) {
+      expenses.push({ ...remote, synced: true });
+      added++;
+    } else {
+      const local = expenses[idx];
+      const rt = remote.updatedAt || remote.createdAt || '';
+      const lt = local.updatedAt || local.createdAt || '';
+      if (rt > lt) { expenses[idx] = { ...remote, synced: true }; updated++; }
+    }
+  });
+  const remoteIds = new Set(remoteExpenses.map(function(e) { return e.id; }));
+  const before = expenses.length;
+  expenses = expenses.filter(function(e) { return remoteIds.has(e.id); });
+  removed = before - expenses.length;
+  if (added > 0 || updated > 0 || removed > 0) {
+    expenses.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+    saveToStorage();
+    updateHeader();
+    renderExpenses();
+    if (document.getElementById('screen-stats') &&
+        document.getElementById('screen-stats').classList.contains('active')) renderStats();
+    localStorage.setItem('fin_last_sync', new Date().toISOString());
+    updateSyncTime();
+    const msgs = [];
+    if (added > 0) msgs.push(added + ' novo(s)');
+    if (updated > 0) msgs.push(updated + ' atualizado(s)');
+    if (removed > 0) msgs.push(removed + ' removido(s)');
+    if (msgs.length) showToast('🔄 ' + msgs.join(', '));
+  }
+  updateSyncBadge(true);
+};
+
+// Bridge: called by Firebase module when config updates
+window.onFirebaseConfig = function(data) {
+  const localUpdated = localStorage.getItem('fin_config_updated') || '';
+  if (data.updatedAt && data.updatedAt <= localUpdated) return;
+  let changed = false;
+  if (data.customCategories && Array.isArray(data.customCategories)) {
+    const localIds = new Set(customCategories.map(c => c.id));
+    data.customCategories.forEach(rc => {
+      if (!localIds.has(rc.id)) { customCategories.push(rc); changed = true; }
+      else { const i=customCategories.findIndex(c=>c.id===rc.id); if(i!==-1){customCategories[i]=rc; changed=true;} }
+    });
+    localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+  }
+  if (data.categoryBudgets) {
+    Object.entries(data.categoryBudgets).forEach(([id,val]) => { categoryBudgets[id]=val; changed=true; });
+    localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
+  }
+  if (data.budget && data.budget > 0 && data.budget !== budget) {
+    budget = data.budget;
+    localStorage.setItem('fin_budget', budget.toString());
+    const bi = document.getElementById('budgetInput');
+    if (bi) bi.value = budget.toFixed(2);
+    changed = true;
+  }
+  if (data.catOverrides) {
+    const lo = JSON.parse(localStorage.getItem('fin_cat_overrides')||'{}');
+    Object.entries(data.catOverrides).forEach(([id,d]) => {
+      lo[id]=d; const cat=CATEGORIES.find(c=>c.id===id);
+      if(cat){cat.label=d.label;cat.icon=d.icon;} changed=true;
+    });
+    localStorage.setItem('fin_cat_overrides', JSON.stringify(lo));
+  }
+  if (changed) {
+    if (data.updatedAt) localStorage.setItem('fin_config_updated', data.updatedAt);
+    renderCategoryGrid();
+    if (document.getElementById('screen-cats') &&
+        document.getElementById('screen-cats').classList.contains('active')) renderCatScreen();
+    updateHeader();
+    showToast('🔄 Categorias e orçamentos atualizados!');
+  }
+};
+
+// Bridge: called by Firebase module when recurring updates
+window.onFirebaseRecurring = function(data) {
+  if (!data || !data.recurringExpenses) return;
+  const localUpdated = localStorage.getItem('fin_recurring_updated') || '';
+  if (data.updatedAt && data.updatedAt <= localUpdated) return;
+  const localIds = new Set(recurringExpenses.map(r => r.id));
+  let added = 0;
+  data.recurringExpenses.forEach(rr => {
+    if (!localIds.has(rr.id)) { recurringExpenses.push(rr); added++; }
+    else { const i=recurringExpenses.findIndex(x=>x.id===rr.id); if(i!==-1) recurringExpenses[i]=rr; }
+  });
+  localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses));
+  if (data.updatedAt) localStorage.setItem('fin_recurring_updated', data.updatedAt);
+  if (document.getElementById('screen-recur') &&
+      document.getElementById('screen-recur').classList.contains('active')) renderRecurList();
+  if (added > 0) showToast('🔄 ' + added + ' gasto(s) fixo(s) recebido(s)!');
+};
+
+// Listen for Firebase ready
+window.addEventListener('firebase-ready', function() {
+  fbReady = true;
+  console.log('Firebase conectado!');
+  updateSyncBadge(true);
+  // Auto-push configs after 2s
+  setTimeout(function() { syncConfig(); syncRecurring(); }, 2000);
+});
+
 let expenses = [];
 let selectedPerson = 'Welinton';
 let selectedCategory = null;
