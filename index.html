@@ -708,6 +708,10 @@
           <span class="config-row-label">Buscar dados do Sheets</span>
           <span class="config-row-value">⬇️</span>
         </div>
+        <div class="config-row" onclick="forceSyncAll()">
+          <span class="config-row-label">Enviar tudo ao Firebase agora</span>
+          <span class="config-row-value">⬆️🔥</span>
+        </div>
       </div>
 
       <div class="config-section">
@@ -1665,41 +1669,39 @@ function saveBudget() {
 let syncPollingTimer = null;
 const SYNC_INTERVAL = 60000; // 60 seconds
 
-// ── Send one expense to Sheets ──
+// ── Send one expense to Firebase ──
 async function syncExpense(expense, action) {
-  if (!config.scriptUrl || !expense) return;
+  if (!expense) return;
+  if (!window._fb) { expense.synced = false; saveToStorage(); return; }
+  fbReady = true;
   action = action || 'addExpense';
   updateSyncBadge('syncing');
   try {
-    // Use no-cors for POST (Apps Script limitation)
-    await fetch(config.scriptUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, expense })
+    const { db, ref, set, remove } = getFB();
+    await set(ref(db, 'expenses/' + expense.id), {
+      ...expense, synced: true,
+      updatedAt: expense.updatedAt || new Date().toISOString()
     });
     expense.synced = true;
     saveToStorage();
     updateSyncBadge(true);
-    renderExpenses();
+    localStorage.setItem('fin_last_sync', new Date().toISOString());
+    updateSyncTime();
   } catch(e) {
+    console.log('syncExpense error:', e);
     expense.synced = false;
     saveToStorage();
     updateSyncBadge(false);
   }
 }
 
-// ── Delete from Sheets ──
+// ── Delete expense from Firebase ──
 async function syncDelete(expenseId) {
-  if (!config.scriptUrl) return;
+  if (!window._fb) return;
   try {
-    await fetch(config.scriptUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'deleteExpense', expenseId })
-    });
-  } catch(e) { console.log('Delete sync failed:', e); }
+    const { db, ref, remove } = getFB();
+    await remove(ref(db, 'expenses/' + expenseId));
+  } catch(e) { console.log('syncDelete error:', e); }
 }
 
 // ── Pull data from Sheets via GET ──
@@ -1879,15 +1881,28 @@ function saveConfig() {
 }
 
 async function forceSyncAll() {
-  if (!fbReady) { showToast('⚠️ Firebase não conectado'); return; }
+  if (!window._fb) { showToast('⏳ Firebase conectando, tente em 3 segundos...'); return; }
+  fbReady = true;
   showToast('⏳ Enviando tudo ao Firebase...');
   updateSyncBadge('syncing');
-  const unsynced = expenses.filter(e => !e.synced);
-  for (const e of unsynced) await syncExpense(e, 'addExpense');
-  await syncConfig();
-  await syncRecurring();
-  showToast('✅ Tudo enviado ao Firebase!');
-  updateSyncBadge(true);
+  try {
+    const { db, ref, set } = getFB();
+    for (const e of expenses) {
+      try {
+        await set(ref(db, 'expenses/' + e.id), {
+          ...e, synced: true,
+          updatedAt: e.updatedAt || e.createdAt || new Date().toISOString()
+        });
+      } catch(err) { console.log('Error syncing expense:', e.id, err); }
+    }
+    await syncConfig();
+    await syncRecurring();
+    showToast('✅ Tudo enviado ao Firebase!');
+    updateSyncBadge(true);
+  } catch(e) {
+    showToast('❌ Erro: ' + e.message);
+    updateSyncBadge(false);
+  }
 }
 
 function clearData() {
