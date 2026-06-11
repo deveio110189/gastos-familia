@@ -609,14 +609,10 @@
   <div class="header">
     <div class="header-top">
       <span class="app-title">💰 Gastos Família</span>
-      <div class="month-nav">
-        <button class="month-nav-btn" onclick="changeMonth(-1)">‹</button>
-        <div style="display:flex;flex-direction:column;align-items:center;min-width:90px">
-          <span class="month-label" id="monthLabel"></span>
-          <span id="monthFutureTag" style="font-size:9px;color:rgba(255,255,255,0.5);display:none">📅 futuro</span>
-        </div>
-        <button class="month-nav-btn" onclick="changeMonth(1)">›</button>
-      </div>
+        <button onclick="openMonthPicker()" style="background:rgba(255,255,255,0.15);border:none;border-radius:20px;padding:5px 14px;cursor:pointer;display:flex;align-items:center;gap:6px">
+          <span class="month-label" id="monthLabel" style="font-size:13px;font-weight:600;color:#fff"></span>
+          <span style="font-size:11px;color:rgba(255,255,255,0.7)">▼</span>
+        </button>
     </div>
     <div class="header-boxes">
       <div class="header-box">
@@ -1148,6 +1144,23 @@
     </div>
   </div>
 
+  <!-- Month Picker Modal -->
+  <div class="modal-overlay" id="monthPickerModal" onclick="handleMonthPickerClick(event)">
+    <div class="modal-sheet" style="max-height:70dvh">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Selecionar período</div>
+
+      <!-- Quick options -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px" id="quickMonthBtns"></div>
+
+      <!-- Custom month picker -->
+      <div class="form-group">
+        <label class="form-label">Ou escolha um mês específico</label>
+        <input type="month" class="text-input" id="monthPickerInput" onchange="applyMonthPicker()" />
+      </div>
+    </div>
+  </div>
+
   <!-- Exit Modal -->
   <div class="exit-modal-overlay" id="exitModal">
     <div class="exit-modal-box">
@@ -1577,12 +1590,74 @@ function saveToStorage() { localStorage.setItem('fin_expenses', JSON.stringify(e
 // ── Month navigation ──
 function changeMonth(dir) {
   currentMonthOffset += dir;
-  // Allow up to 24 months in the future to view installments
   if (currentMonthOffset > 24) currentMonthOffset = 24;
   updateMonthLabel();
   updateHeader();
   renderExpenses();
   if (document.getElementById('screen-stats').classList.contains('active')) { renderStats(); renderMonthlyChart(); }
+}
+
+function openMonthPicker() {
+  const now = new Date();
+  const { year, month } = getViewMonth();
+
+  // Set current value in input
+  const inp = document.getElementById('monthPickerInput');
+  if (inp) inp.value = `${year}-${String(month).padStart(2,'0')}`;
+
+  // Build quick options: 6 past months + current + 12 future months
+  const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const btns = document.getElementById('quickMonthBtns');
+  if (btns) {
+    let html = '';
+    // Past 3 months + current + next 8 months
+    for (let i = -3; i <= 8; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const prefix = `${y}-${String(m).padStart(2,'0')}`;
+      const label = `${monthNames[d.getMonth()]}/${y}`;
+      const isCurrent = i === 0;
+      const isSelected = (y === year && m === month);
+      html += `<button onclick="selectMonth('${prefix}')" style="
+        padding:10px;border-radius:10px;border:2px solid ${isSelected?'var(--green-500)':'var(--border)'};
+        background:${isSelected?'var(--green-50)':isCurrent?'var(--surface-raised)':'var(--surface)'};
+        font-family:var(--font);font-size:13px;font-weight:${isSelected||isCurrent?'700':'500'};
+        color:${isSelected?'var(--green-900)':isCurrent?'var(--green-700)':'var(--text)'};
+        cursor:pointer;transition:all 0.15s;text-align:center">
+        ${label}${isCurrent?' ✦':''}
+      </button>`;
+    }
+    btns.innerHTML = html;
+  }
+
+  document.getElementById('monthPickerModal').classList.add('open');
+}
+
+function selectMonth(prefix) {
+  const [y, m] = prefix.split('-').map(Number);
+  const now = new Date();
+  currentMonthOffset = (y - now.getFullYear()) * 12 + (m - (now.getMonth() + 1));
+  closeMonthPicker();
+  updateMonthLabel();
+  updateHeader();
+  renderExpenses();
+  if (document.getElementById('screen-stats').classList.contains('active')) { renderStats(); renderMonthlyChart(); }
+  const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  showToast(`📅 ${monthNames[m-1]}/${y}`);
+}
+
+function applyMonthPicker() {
+  const val = document.getElementById('monthPickerInput').value;
+  if (val) selectMonth(val);
+}
+
+function closeMonthPicker() {
+  document.getElementById('monthPickerModal').classList.remove('open');
+}
+
+function handleMonthPickerClick(e) {
+  if (e.target === e.currentTarget) closeMonthPicker();
 }
 
 function getViewMonth() {
@@ -3728,6 +3803,8 @@ window.addEventListener('popstate', function(e) {
   const delCatModal = document.getElementById('delCatModal');
 
   // Fechar qualquer modal aberto
+  const monthPickerModal = document.getElementById('monthPickerModal');
+  if (monthPickerModal && monthPickerModal.classList.contains('open')) { closeMonthPicker(); return; }
   if (pwdModal && pwdModal.classList.contains('open')) { closePwdModal(); return; }
   if (addModal && addModal.classList.contains('open')) { closeModal(); return; }
   if (delModal && delModal.classList.contains('open')) { closeDelModal(); return; }
