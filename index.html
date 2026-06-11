@@ -1568,7 +1568,8 @@ function saveToStorage() { localStorage.setItem('fin_expenses', JSON.stringify(e
 // ── Month navigation ──
 function changeMonth(dir) {
   currentMonthOffset += dir;
-  if (currentMonthOffset > 0) currentMonthOffset = 0;
+  // Allow up to 24 months in the future to view installments
+  if (currentMonthOffset > 24) currentMonthOffset = 24;
   updateMonthLabel();
   updateHeader();
   renderExpenses();
@@ -3018,7 +3019,7 @@ function jumpToMonth(prefix) {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
   const offset = (parseInt(year) - currentYear) * 12 + (parseInt(month) - currentMonth);
-  currentMonthOffset = Math.max(-60, Math.min(0, offset));
+  currentMonthOffset = Math.max(-60, Math.min(24, offset));
   updateMonthLabel();
   updateHeader();
   renderExpenses();
