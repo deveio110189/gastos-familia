@@ -542,6 +542,24 @@
     .installment-pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: var(--purple-50); color: var(--purple-700); white-space: nowrap; }
     .future-expense { opacity: 0.7; }
     .future-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; background: var(--blue-50); color: var(--blue-700); }
+
+    /* ── User selection screen ── */
+    .user-select-overlay { position: fixed; inset: 0; background: var(--green-700); z-index: 9998; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; transition: opacity 0.4s ease; }
+    .user-select-overlay.hide { opacity: 0; pointer-events: none; }
+    .user-select-title { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 6px; text-align: center; }
+    .user-select-sub { font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 40px; text-align: center; }
+    .user-select-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 340px; }
+    .user-card { background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 24px 16px; cursor: pointer; text-align: center; transition: all 0.18s; -webkit-tap-highlight-color: transparent; }
+    .user-card:active { transform: scale(0.95); background: rgba(255,255,255,0.22); }
+    .user-card-avatar { width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; }
+    .user-card-avatar.w { background: rgba(55,138,221,0.3); color: #fff; }
+    .user-card-avatar.d { background: rgba(127,119,221,0.3); color: #fff; }
+    .user-card-name { font-size: 18px; font-weight: 700; color: #fff; }
+    .user-card-sub { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 4px; }
+    .current-user-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: none; font-family: var(--font); }
+    .current-user-badge.w { background: rgba(55,138,221,0.15); color: #185FA5; }
+    .current-user-badge.d { background: rgba(127,119,221,0.15); color: #534AB7; }
+    .current-user-badge:active { opacity: 0.7; }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -554,6 +572,26 @@
 </head>
 <body>
 <div id="app">
+  <!-- User Selection Screen -->
+  <div id="userSelectScreen" class="user-select-overlay" style="display:none">
+    <div style="font-size:48px;margin-bottom:16px">💰</div>
+    <div class="user-select-title">Gastos Família</div>
+    <div class="user-select-sub">Quem está usando o app agora?</div>
+    <div class="user-select-cards">
+      <div class="user-card" onclick="selectCurrentUser('Welinton')">
+        <div class="user-card-avatar w">W</div>
+        <div class="user-card-name">Welinton</div>
+        <div class="user-card-sub">Toque para entrar</div>
+      </div>
+      <div class="user-card" onclick="selectCurrentUser('Débora')">
+        <div class="user-card-avatar d">D</div>
+        <div class="user-card-name">Débora</div>
+        <div class="user-card-sub">Toque para entrar</div>
+      </div>
+    </div>
+    <p style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:32px;text-align:center">Você pode trocar o usuário a qualquer momento nas configurações</p>
+  </div>
+
   <!-- Splash -->
   <div id="splash">
     <img src="icons/splash.png" alt="Gastos Família" onerror="this.style.display='none'" />
@@ -619,6 +657,10 @@
     <div class="screen active" id="screen-home">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div id="syncBadge" class="sync-badge sync-ok"><span class="status-dot dot-green"></span> Sincronizado<span class="sync-time" id="syncTime"></span></div>
+        <button class="current-user-badge w" id="currentUserBadge" onclick="showUserSelect()" title="Trocar usuário">
+          <span id="currentUserIcon">W</span>
+          <span id="currentUserName">Welinton</span>
+        </button>
         <button id="alertToggleBtn" onclick="toggleAlerts()" style="display:none;background:none;border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;color:var(--amber-700);background:var(--amber-50);border:1px solid var(--amber-200)"></button>
       </div>
       <div id="budgetAlertWrap" style="display:none"></div>
@@ -872,6 +914,20 @@
       </div>
 
       <div class="config-section">
+        <div class="config-section-title">Usuário ativo</div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:12px;padding:6px 0">
+            <div id="configUserAvatar" style="width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;background:var(--blue-50);color:var(--blue-700)">W</div>
+            <div>
+              <div style="font-size:15px;font-weight:700" id="configUserName">Welinton</div>
+              <div style="font-size:12px;color:var(--text-hint)">Usuário ativo no momento</div>
+            </div>
+          </div>
+          <button class="btn-secondary" onclick="showUserSelect()" style="margin-top:10px;margin-bottom:0">🔄 Trocar usuário</button>
+        </div>
+      </div>
+
+      <div class="config-section">
         <div class="config-section-title">Dados locais</div>
         <button class="btn-danger" onclick="clearData()">🗑️ Limpar dados locais</button>
       </div>
@@ -1113,18 +1169,13 @@
       <div class="modal-handle"></div>
       <div class="modal-title" id="modalTitle">Novo gasto</div>
 
-      <div class="form-group">
-        <label class="form-label">Quem está lançando?</label>
-        <div class="person-picker">
-          <button class="person-btn selected" onclick="selectPerson('Welinton')" id="btnWelinton">
-            <div class="person-btn-avatar avatar-w">W</div>
-            <div class="person-btn-name">Welinton</div>
-          </button>
-          <button class="person-btn" onclick="selectPerson('Débora')" id="btnDebora">
-            <div class="person-btn-avatar avatar-d">D</div>
-            <div class="person-btn-name">Débora</div>
-          </button>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;background:var(--surface-raised);border-radius:var(--radius-sm);border:1px solid var(--border)">
+        <div id="modalUserAvatar" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;background:var(--blue-50);color:var(--blue-700)">W</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600" id="modalUserName">Welinton</div>
+          <div style="font-size:11px;color:var(--text-hint)">lançando este gasto</div>
         </div>
+        <button onclick="showUserSelect()" style="font-size:11px;color:var(--green-700);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:600;padding:4px 8px;border-radius:20px;background:var(--green-50)">Trocar</button>
       </div>
 
       <div class="form-group">
@@ -1438,6 +1489,16 @@ let currentMonthOffset = 0; // 0 = current month, -1 = last month, etc.
 // ── Init ──
 function init() {
   setTimeout(() => document.getElementById('splash').classList.add('hide'), 1800);
+
+  // Show user selection if no user saved, otherwise load saved user
+  if (!currentUser) {
+    setTimeout(() => {
+      const screen = document.getElementById('userSelectScreen');
+      if (screen) screen.style.display = 'flex';
+    }, 2000); // Show after splash
+  } else {
+    updateUserUI();
+  }
   loadCategories();
   loadRecurring();
   setTimeout(checkAndLaunchRecurring, 1500);
@@ -1579,8 +1640,16 @@ function selectCategory(id) {
 
 function selectPerson(p) {
   selectedPerson = p;
-  document.getElementById('btnWelinton').classList.toggle('selected', p === 'Welinton');
-  document.getElementById('btnDebora').classList.toggle('selected', p === 'Débora');
+  // Update modal display if elements exist
+  const modalAvatar = document.getElementById('modalUserAvatar');
+  const modalName = document.getElementById('modalUserName');
+  const isW = p === 'Welinton';
+  if (modalAvatar) {
+    modalAvatar.style.background = isW ? 'var(--blue-50)' : 'var(--purple-50)';
+    modalAvatar.style.color = isW ? 'var(--blue-700)' : 'var(--purple-700)';
+    modalAvatar.textContent = isW ? 'W' : 'D';
+  }
+  if (modalName) modalName.textContent = p;
 }
 
 function setDefaultDate() {
@@ -1611,8 +1680,11 @@ function openAddModal(editId = null) {
     document.getElementById('amountInput').value = '';
     document.getElementById('descInput').value = '';
     setDefaultDate();
-    selectPerson('Welinton');
+    selectPerson(currentUser || 'Welinton');
   }
+
+  // Update modal user display
+  updateUserUI();
 
   // Reset installment
   installmentActive = false;
@@ -3467,6 +3539,70 @@ function toggleRecurVar() {
   if (toggle) toggle.classList.toggle('active', recurVarActive);
   if (hint) hint.style.display = recurVarActive ? 'block' : 'none';
   vibrate(20);
+}
+
+// ════════════════════════════════════════════
+// USER SELECTION
+// ════════════════════════════════════════════
+let currentUser = localStorage.getItem('fin_current_user') || null;
+
+function selectCurrentUser(name) {
+  currentUser = name;
+  localStorage.setItem('fin_current_user', name);
+  selectedPerson = name;
+
+  // Hide user select screen
+  const screen = document.getElementById('userSelectScreen');
+  if (screen) { screen.classList.add('hide'); setTimeout(() => screen.style.display = 'none', 400); }
+
+  updateUserUI();
+  vibrate(40);
+  showToast(`👋 Olá, ${name}!`);
+}
+
+function showUserSelect() {
+  const screen = document.getElementById('userSelectScreen');
+  if (!screen) return;
+  screen.style.display = 'flex';
+  screen.classList.remove('hide');
+  // Close config if open
+  if (currentScreen === 'config') {
+    configUnlocked = false;
+    _origShowScreen('home');
+    currentScreen = 'home';
+  }
+}
+
+function updateUserUI() {
+  if (!currentUser) return;
+  const isW = currentUser === 'Welinton';
+  const icon = isW ? 'W' : 'D';
+  const bgColor = isW ? 'var(--blue-50)' : 'var(--purple-50)';
+  const textColor = isW ? 'var(--blue-700)' : 'var(--purple-700)';
+  const badgeClass = isW ? 'w' : 'd';
+
+  // Header badge
+  const badge = document.getElementById('currentUserBadge');
+  const badgeIcon = document.getElementById('currentUserIcon');
+  const badgeName = document.getElementById('currentUserName');
+  if (badge) { badge.className = `current-user-badge ${badgeClass}`; }
+  if (badgeIcon) badgeIcon.textContent = icon;
+  if (badgeName) badgeName.textContent = currentUser;
+
+  // Modal user info
+  const modalAvatar = document.getElementById('modalUserAvatar');
+  const modalName = document.getElementById('modalUserName');
+  if (modalAvatar) { modalAvatar.style.background = bgColor; modalAvatar.style.color = textColor; modalAvatar.textContent = icon; }
+  if (modalName) modalName.textContent = currentUser;
+
+  // Config screen
+  const configAvatar = document.getElementById('configUserAvatar');
+  const configName = document.getElementById('configUserName');
+  if (configAvatar) { configAvatar.style.background = bgColor; configAvatar.style.color = textColor; configAvatar.textContent = icon; }
+  if (configName) configName.textContent = currentUser;
+
+  // Set selectedPerson to current user
+  selectedPerson = currentUser;
 }
 
 // ── Toast ──
