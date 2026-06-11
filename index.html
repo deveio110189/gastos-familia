@@ -544,7 +544,7 @@
     .future-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; background: var(--blue-50); color: var(--blue-700); }
 
     /* ── User selection screen ── */
-    .user-select-overlay { position: fixed; inset: 0; background: var(--green-700); z-index: 9998; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; transition: opacity 0.4s ease; }
+    .user-select-overlay { position: fixed; inset: 0; background: var(--green-700); z-index: 9998; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; transition: opacity 0.4s ease; pointer-events: none; }
     .user-select-overlay.hide { opacity: 0; pointer-events: none; }
     .user-select-title { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 6px; text-align: center; }
     .user-select-sub { font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 40px; text-align: center; }
@@ -1519,19 +1519,21 @@ function init() {
   if (tabW && USER_AVATARS['Welinton']) { tabW.src = USER_AVATARS['Welinton']; tabW.style.display = 'inline-block'; }
   if (tabD && USER_AVATARS['Débora']) { tabD.src = USER_AVATARS['Débora']; tabD.style.display = 'inline-block'; }
 
-  // Ensure userSelectScreen never blocks UI
+  // Ensure userSelectScreen starts hidden
   const userScreen = document.getElementById('userSelectScreen');
   if (userScreen) {
     userScreen.style.display = 'none';
     userScreen.style.pointerEvents = 'none';
+    userScreen.style.opacity = '0';
   }
 
-  // Show user selection if no user saved, otherwise load saved user
+  // Show user selection if no user saved
   if (!currentUser) {
     setTimeout(() => {
       if (userScreen) {
         userScreen.style.display = 'flex';
         userScreen.style.pointerEvents = 'all';
+        userScreen.style.opacity = '1';
       }
     }, 2000);
   } else {
@@ -3656,11 +3658,11 @@ function selectCurrentUser(name) {
   localStorage.setItem('fin_current_user', name);
   selectedPerson = name;
 
-  // Hide user select screen immediately
+  // Hide user select screen immediately - no pointer events at all
   const screen = document.getElementById('userSelectScreen');
   if (screen) {
-    screen.style.pointerEvents = 'none'; // immediately stop blocking clicks
-    screen.classList.add('hide');
+    screen.style.pointerEvents = 'none';
+    screen.style.opacity = '0';
     setTimeout(() => { screen.style.display = 'none'; }, 400);
   }
 
@@ -3674,8 +3676,8 @@ function showUserSelect() {
   if (!screen) return;
   screen.style.display = 'flex';
   screen.style.pointerEvents = 'all';
+  screen.style.opacity = '1';
   screen.classList.remove('hide');
-  // Close config if open
   if (currentScreen === 'config') {
     configUnlocked = false;
     _origShowScreen('home');
