@@ -1506,11 +1506,20 @@ function init() {
   if (tabW && USER_AVATARS['Welinton']) { tabW.src = USER_AVATARS['Welinton']; tabW.style.display = 'inline-block'; }
   if (tabD && USER_AVATARS['Débora']) { tabD.src = USER_AVATARS['Débora']; tabD.style.display = 'inline-block'; }
 
+  // Ensure userSelectScreen never blocks UI
+  const userScreen = document.getElementById('userSelectScreen');
+  if (userScreen) {
+    userScreen.style.display = 'none';
+    userScreen.style.pointerEvents = 'none';
+  }
+
   // Show user selection if no user saved, otherwise load saved user
   if (!currentUser) {
     setTimeout(() => {
-      const screen = document.getElementById('userSelectScreen');
-      if (screen) screen.style.display = 'flex';
+      if (userScreen) {
+        userScreen.style.display = 'flex';
+        userScreen.style.pointerEvents = 'all';
+      }
     }, 2000);
   } else {
     updateUserUI();
@@ -3572,9 +3581,13 @@ function selectCurrentUser(name) {
   localStorage.setItem('fin_current_user', name);
   selectedPerson = name;
 
-  // Hide user select screen
+  // Hide user select screen immediately
   const screen = document.getElementById('userSelectScreen');
-  if (screen) { screen.classList.add('hide'); setTimeout(() => screen.style.display = 'none', 400); }
+  if (screen) {
+    screen.style.pointerEvents = 'none'; // immediately stop blocking clicks
+    screen.classList.add('hide');
+    setTimeout(() => { screen.style.display = 'none'; }, 400);
+  }
 
   updateUserUI();
   vibrate(40);
@@ -3585,6 +3598,7 @@ function showUserSelect() {
   const screen = document.getElementById('userSelectScreen');
   if (!screen) return;
   screen.style.display = 'flex';
+  screen.style.pointerEvents = 'all';
   screen.classList.remove('hide');
   // Close config if open
   if (currentScreen === 'config') {
