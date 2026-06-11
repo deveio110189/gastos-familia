@@ -609,7 +609,7 @@
   <div class="header">
     <div class="header-top">
       <span class="app-title">💰 Gastos Família</span>
-        <span class="month-label" id="monthLabel"></span>
+      <div id="syncBadge" class="sync-badge sync-ok" style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9)"><span class="status-dot dot-green"></span> Sincronizado<span class="sync-time" id="syncTime"></span></div>
     </div>
     <div class="header-boxes">
       <div class="header-box">
@@ -659,7 +659,11 @@
     <!-- Home -->
     <div class="screen active" id="screen-home">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div id="syncBadge" class="sync-badge sync-ok"><span class="status-dot dot-green"></span> Sincronizado<span class="sync-time" id="syncTime"></span></div>
+        <button onclick="openMonthPicker()" style="display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1.5px solid var(--border-strong);border-radius:20px;padding:6px 14px;cursor:pointer;font-family:var(--font)">
+          <span style="font-size:14px">📅</span>
+          <span id="monthPickerLabel" style="font-size:13px;font-weight:700;color:var(--text)">Jun 2026</span>
+          <span style="font-size:10px;color:var(--text-hint)">▼</span>
+        </button>
         <button class="current-user-badge w" id="currentUserBadge" onclick="showUserSelect()" title="Trocar usuário">
           <span id="currentUserIcon">W</span>
           <span id="currentUserName">Welinton</span>
@@ -1677,9 +1681,7 @@ function updateMonthLabel() {
   const el = document.getElementById('monthLabel');
   if (el) el.textContent = label;
   const pickerLabel = document.getElementById('monthPickerLabel');
-  if (pickerLabel) pickerLabel.textContent = label + (currentMonthOffset !== 0 ? (currentMonthOffset > 0 ? ' 📅' : '') : '');
-  const futureTag = document.getElementById('monthFutureTag');
-  if (futureTag) futureTag.style.display = currentMonthOffset > 0 ? 'block' : 'none';
+  if (pickerLabel) pickerLabel.textContent = currentMonthOffset > 0 ? `${label} 📅` : label;
 }
 
 function fmtCurrency(v) {
@@ -2378,19 +2380,23 @@ function updateSyncBadge(state) {
   const b = document.getElementById('syncBadge');
   const dot = document.getElementById('fbStatusDot');
   const txt = document.getElementById('fbStatusText');
+  if (!b) return;
   if (state === 'syncing') {
-    b.className = 'sync-badge sync-pending';
-    b.innerHTML = '<span class="spinner" style="border-color:rgba(186,117,23,0.4);border-top-color:#BA7517;width:10px;height:10px;margin-right:5px"></span> Sincronizando...';
+    b.style.background = 'rgba(186,117,23,0.25)';
+    b.style.color = 'rgba(255,255,255,0.9)';
+    b.innerHTML = '<span class="spinner" style="border-color:rgba(255,255,255,0.4);border-top-color:#fff;width:10px;height:10px;margin-right:5px"></span> Sincronizando...';
     if (dot) dot.className = 'status-dot dot-amber';
     if (txt) txt.textContent = 'Sincronizando...';
   } else if (state === true) {
-    b.className = 'sync-badge sync-ok';
+    b.style.background = 'rgba(255,255,255,0.15)';
+    b.style.color = 'rgba(255,255,255,0.9)';
     b.innerHTML = '<span class="status-dot dot-green"></span> Sincronizado<span class="sync-time" id="syncTime"></span>';
     updateSyncTime();
     if (dot) dot.className = 'status-dot dot-green';
     if (txt) txt.textContent = 'Conectado — sincronização em tempo real ativa';
   } else {
-    b.className = 'sync-badge sync-error';
+    b.style.background = 'rgba(226,75,74,0.25)';
+    b.style.color = 'rgba(255,255,255,0.9)';
     b.innerHTML = '<span class="status-dot dot-red"></span> Sem conexão';
     b.onclick = () => syncNow(false);
     b.style.cursor = 'pointer';
