@@ -609,10 +609,7 @@
   <div class="header">
     <div class="header-top">
       <span class="app-title">💰 Gastos Família</span>
-        <button onclick="openMonthPicker()" style="background:rgba(255,255,255,0.15);border:none;border-radius:20px;padding:5px 14px;cursor:pointer;display:flex;align-items:center;gap:6px">
-          <span class="month-label" id="monthLabel" style="font-size:13px;font-weight:600;color:#fff"></span>
-          <span style="font-size:11px;color:rgba(255,255,255,0.7)">▼</span>
-        </button>
+        <span class="month-label" id="monthLabel"></span>
     </div>
     <div class="header-boxes">
       <div class="header-box">
@@ -1676,7 +1673,11 @@ function getViewMonthPrefix() {
 function updateMonthLabel() {
   const { year, month } = getViewMonth();
   const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  document.getElementById('monthLabel').textContent = `${months[month-1]} ${year}`;
+  const label = `${months[month-1]} ${year}`;
+  const el = document.getElementById('monthLabel');
+  if (el) el.textContent = label;
+  const pickerLabel = document.getElementById('monthPickerLabel');
+  if (pickerLabel) pickerLabel.textContent = label + (currentMonthOffset !== 0 ? (currentMonthOffset > 0 ? ' 📅' : '') : '');
   const futureTag = document.getElementById('monthFutureTag');
   if (futureTag) futureTag.style.display = currentMonthOffset > 0 ? 'block' : 'none';
 }
