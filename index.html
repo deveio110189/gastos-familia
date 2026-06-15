@@ -1601,6 +1601,8 @@ let expenses = [];
 let selectedPerson = 'Welinton';
 let selectedCategory = null;
 let filterPerson_ = 'Todos';
+let filterCategory = null;
+let currentSort = 'date';
 let config = { scriptUrl: '' };
 let budget = 0;
 let editingId = null;
@@ -3953,8 +3955,6 @@ function updateUserUI() {
 // ════════════════════════════════════════════
 // SORT
 // ════════════════════════════════════════════
-let currentSort = 'date';
-
 function setSort(sort) {
   currentSort = sort;
   document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
@@ -3966,8 +3966,6 @@ function setSort(sort) {
 // ════════════════════════════════════════════
 // CATEGORY FILTER
 // ════════════════════════════════════════════
-let filterCategory = null;
-
 function renderCatFilter() {
   const wrap = document.getElementById('catFilterWrap');
   if (!wrap) return;
