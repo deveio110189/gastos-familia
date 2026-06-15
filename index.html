@@ -561,22 +561,21 @@
     .current-user-badge.d { background: rgba(127,119,221,0.15); color: #534AB7; }
     .current-user-badge:active { opacity: 0.7; }
 
-    /* ── Sort buttons ── */
-    .sort-wrap { display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
-    .sort-btn { padding: 5px 12px; border-radius: 20px; border: 1.5px solid var(--border-strong); background: var(--surface); font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: all 0.15s; flex-shrink: 0; }
-    .sort-btn.active { background: var(--green-500); border-color: var(--green-500); color: #fff; }
-    /* ── Category filter ── */
-    .cat-filter-wrap { display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
-    .cat-filter-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface); font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
-    .cat-filter-btn.active { background: var(--green-50); border-color: var(--green-500); color: var(--green-900); }
-    /* ── Weekly card ── */
-    .week-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
-    .week-row { display: flex; justify-content: space-between; align-items: center; }
-    .week-label { font-size: 11px; font-weight: 600; color: var(--text-hint); text-transform: uppercase; letter-spacing: 0.06em; }
-    .week-value { font-size: 18px; font-weight: 700; font-family: var(--mono); color: var(--red-700); }
-    .week-sub { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
-    .week-bar-track { height: 5px; background: var(--gray-100); border-radius: 3px; overflow: hidden; margin: 6px 0 4px; }
-    .week-bar-fill { height: 100%; border-radius: 3px; background: var(--green-500); transition: width 0.4s; }
+    /* ── Filter modal ── */
+    .filter-btn { display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--border-strong);background:var(--surface);font-family:var(--font);font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:all 0.15s;flex-shrink:0; }
+    .filter-btn.active { background:var(--green-50);border-color:var(--green-500);color:var(--green-900); }
+    .filter-section-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-hint);margin:16px 0 8px; }
+    .filter-options { display:flex;flex-wrap:wrap;gap:6px; }
+    .filter-option { padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface-raised);font-family:var(--font);font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer;transition:all 0.15s; }
+    .filter-option.active { background:var(--green-500);border-color:var(--green-500);color:#fff;font-weight:600; }
+
+    /* ── Installment delete options ── */
+    .inst-del-option { display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--surface-raised);cursor:pointer;margin-bottom:8px;transition:all 0.15s; }
+    .inst-del-option:active { border-color:var(--red-500);background:var(--red-50); }
+
+    /* ── User card stats ── */
+    .user-card-stats { margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6; }
+    .user-card-stats strong { color:rgba(255,255,255,0.9);font-family:var(--mono); }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -601,6 +600,7 @@
         </div>
         <div class="user-card-name">Welinton</div>
         <div class="user-card-sub">Toque para entrar</div>
+        <div class="user-card-stats" id="userStatsW"></div>
       </div>
       <div class="user-card" onclick="selectCurrentUser('Débora')">
         <div class="user-card-avatar d" id="avatarSelectD" style="overflow:hidden;background:none">
@@ -608,6 +608,7 @@
         </div>
         <div class="user-card-name">Débora</div>
         <div class="user-card-sub">Toque para entrar</div>
+        <div class="user-card-stats" id="userStatsD"></div>
       </div>
     </div>
     <p style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:32px;text-align:center">Você pode trocar o usuário a qualquer momento nas configurações</p>
@@ -643,6 +644,7 @@
         <div class="header-box-label">🏦 Saldo Restante</div>
         <div class="header-box-value" id="headerRemaining">R$ 0,00</div>
         <div class="header-box-sub" id="headerRemainingSub">disponível</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:2px;font-family:var(--mono)" id="weekHeaderInfo"></div>
       </div>
     </div>
     <div id="budgetBarWrap" class="budget-bar-wrap" style="display:none">
@@ -709,37 +711,16 @@
         <div style="font-size:11px;color:var(--text-hint)" id="goalInfo"></div>
       </div>
 
-      <!-- Weekly summary -->
-      <div class="week-card" id="weekCard">
-        <div class="week-row">
-          <div>
-            <div class="week-label">📆 Esta semana</div>
-            <div class="week-value" id="weekTotal">R$ 0,00</div>
-            <div class="week-sub" id="weekSub"></div>
-          </div>
-          <div style="text-align:right">
-            <div class="week-label">Média diária</div>
-            <div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--text-muted)" id="weekAvg">R$ 0,00</div>
-            <div class="week-sub" id="weekCount"></div>
-          </div>
+      <!-- Search + Filter -->
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+        <div class="search-wrap" style="flex:1;margin-bottom:0">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="searchInput" placeholder="Buscar gastos..." oninput="onSearchInput()" />
+          <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
         </div>
-        <div class="week-bar-track"><div class="week-bar-fill" id="weekBarFill" style="width:0%"></div></div>
-        <div style="font-size:10px;color:var(--text-hint);margin-top:2px" id="weekInfo"></div>
+        <button class="filter-btn" id="filterToggleBtn" onclick="openFilterModal()">⚙️ Filtrar</button>
       </div>
-      <!-- Category filter chips -->
-      <div class="cat-filter-wrap" id="catFilterWrap"></div>
-      <!-- Search + Sort -->
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input type="text" class="search-input" id="searchInput" placeholder="Buscar gastos..." oninput="onSearchInput()" />
-        <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
-      </div>
-      <div class="sort-wrap">
-        <button class="sort-btn active" id="sort-date" onclick="setSort('date')">📅 Data</button>
-        <button class="sort-btn" id="sort-amount" onclick="setSort('amount')">💰 Valor</button>
-        <button class="sort-btn" id="sort-category" onclick="setSort('category')">🏷️ Categoria</button>
-        <button class="sort-btn" id="sort-person" onclick="setSort('person')">👤 Pessoa</button>
-      </div>
+
       <div id="expenseList"></div>
     </div>
 
@@ -837,6 +818,7 @@
         <!-- Action buttons -->
         <button class="btn-primary" onclick="showReport()" style="margin-bottom:8px">🔍 Exibir em tela</button>
         <button class="btn-secondary" onclick="exportCSV()" style="margin-bottom:8px">⬇️ Baixar CSV</button>
+        <button class="btn-secondary" onclick="exportPDF()" style="margin-bottom:8px">📄 Baixar PDF</button>
         <button class="btn-secondary" onclick="exportToSheets()" style="margin-bottom:0">📊 Enviar ao Google Sheets</button>
       </div>
 
@@ -977,6 +959,7 @@
 
       <div class="config-section">
         <div class="config-section-title">Dados locais</div>
+        <button class="btn-secondary" onclick="exportAllData()" style="margin-bottom:8px">⬇️ Exportar todos os dados (CSV)</button>
         <button class="btn-danger" onclick="clearData()">🗑️ Limpar dados locais</button>
       </div>
     </div>
@@ -1183,6 +1166,53 @@
         <div class="stat-card"><div class="stat-label">Lançamentos</div><div class="stat-value blue" id="catHistCount">0</div></div>
       </div>
       <div id="catHistList"></div>
+    </div>
+  </div>
+
+  <!-- Filter Modal -->
+  <div class="modal-overlay" id="filterModal" onclick="handleFilterModalClick(event)">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Filtrar e ordenar</div>
+
+      <div class="filter-section-title">Ordenar por</div>
+      <div class="filter-options">
+        <button class="filter-option active" id="fsort-date" onclick="setSort('date')">📅 Data</button>
+        <button class="filter-option" id="fsort-amount" onclick="setSort('amount')">💰 Maior valor</button>
+        <button class="filter-option" id="fsort-category" onclick="setSort('category')">🏷️ Categoria</button>
+        <button class="filter-option" id="fsort-person" onclick="setSort('person')">👤 Pessoa</button>
+      </div>
+
+      <div class="filter-section-title">Categoria</div>
+      <div class="filter-options" id="catFilterOptions"></div>
+
+      <div style="margin-top:20px;display:flex;gap:8px">
+        <button class="btn-secondary" style="flex:1;margin-bottom:0" onclick="clearFilters()">Limpar filtros</button>
+        <button class="btn-primary" style="flex:1" onclick="closeFilterModal()">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Installment Delete Modal -->
+  <div class="del-modal-overlay" id="delInstModal">
+    <div class="del-modal-box">
+      <div class="del-modal-title">🗑️ Excluir parcela?</div>
+      <div class="del-modal-desc" id="delInstDesc"></div>
+      <div class="inst-del-option" onclick="confirmDeleteInst('single')">
+        <span style="font-size:20px">1️⃣</span>
+        <div>
+          <div style="font-size:14px;font-weight:700">Só esta parcela</div>
+          <div style="font-size:12px;color:var(--text-hint);margin-top:2px">As outras permanecem</div>
+        </div>
+      </div>
+      <div class="inst-del-option" onclick="confirmDeleteInst('all')">
+        <span style="font-size:20px">🗑️</span>
+        <div>
+          <div style="font-size:14px;font-weight:700">Todas as parcelas</div>
+          <div style="font-size:12px;color:var(--text-hint);margin-top:2px">Remove todo o parcelamento</div>
+        </div>
+      </div>
+      <button class="del-btn-cancel" style="width:100%;margin-top:4px" onclick="closeDelInstModal()">Cancelar</button>
     </div>
   </div>
 
@@ -1975,7 +2005,6 @@ function renderExpenses() {
   else if (currentSort === 'category') filtered.sort((a,b) => (a.categoryLabel||'').localeCompare(b.categoryLabel||''));
   else if (currentSort === 'person') filtered.sort((a,b) => (a.person||'').localeCompare(b.person||''));
   else filtered.sort((a,b) => (b.date||'').localeCompare(a.date||''));
-  renderCatFilter();
 
   if (filtered.length === 0) {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-title">Nenhum gasto ainda</div><div class="empty-desc">Toque no + para adicionar seu primeiro lançamento</div></div>`;
@@ -2110,7 +2139,7 @@ function updateHeader() {
   catAlerts.forEach(a => allAlerts.push(`<div class="budget-alert warn">${a}</div>`));
   updateAlertButton(allAlerts);
   updateSavingsGoal();
-  updateWeekSummary();
+  updateWeekInfo();
 }
 
 // ── Alert toggle ──
@@ -3734,6 +3763,7 @@ function showUserSelect() {
   screen.style.pointerEvents = 'all';
   screen.style.opacity = '1';
   screen.classList.remove('hide');
+  updateUserSelectSummary();
   if (currentScreen === 'config') {
     configUnlocked = false;
     _origShowScreen('home');
@@ -3798,84 +3828,242 @@ function updateUserUI() {
 }
 
 // ════════════════════════════════════════════
-// SORT
+// FILTER MODAL
 // ════════════════════════════════════════════
-function setSort(sort) {
-  currentSort = sort;
-  document.querySelectorAll('.sort-btn').forEach(function(b) { b.classList.remove('active'); });
-  var btn = document.getElementById('sort-' + sort);
-  if (btn) btn.classList.add('active');
-  renderExpenses();
-}
-
-// ════════════════════════════════════════════
-// CATEGORY FILTER
-// ════════════════════════════════════════════
-function renderCatFilter() {
-  var wrap = document.getElementById('catFilterWrap');
-  if (!wrap) return;
+function openFilterModal() {
+  // Populate category options
   var prefix = getViewMonthPrefix();
   var monthExp = expenses.filter(function(e) { return e.date.startsWith(prefix); });
   var cats = {};
   monthExp.forEach(function(e) {
-    if (!cats[e.categoryLabel]) cats[e.categoryLabel] = { icon: e.categoryIcon, count: 0 };
-    cats[e.categoryLabel].count++;
+    if (!cats[e.categoryLabel]) cats[e.categoryLabel] = e.categoryIcon;
   });
-  var sorted = Object.entries(cats).sort(function(a,b) { return b[1].count - a[1].count; });
-  if (!sorted.length) { wrap.innerHTML = ''; return; }
-  var allActive = !filterCategory ? 'active' : '';
-  var btns = '<button class="cat-filter-btn ' + allActive + '" onclick="setCatFilter(null)">✨ Todos</button>';
-  sorted.forEach(function(entry) {
-    var label = entry[0];
-    var d = entry[1];
-    var active = filterCategory === label ? 'active' : '';
-    var idx = label.replace(/"/g, '&quot;');
-    btns += '<button class="cat-filter-btn ' + active + '" onclick="setCatFilter(this.dataset.cat)" data-cat="' + idx + '">' + d.icon + ' ' + label + '</button>';
+  var catOpts = document.getElementById('catFilterOptions');
+  if (catOpts) {
+    var allActive = !filterCategory ? 'active' : '';
+    var html = '<button class="filter-option ' + allActive + '" onclick="setFilterCat(null)">✨ Todas</button>';
+    Object.entries(cats).forEach(function(entry) {
+      var label = entry[0];
+      var icon = entry[1];
+      var active = filterCategory === label ? 'active' : '';
+      var safe = label.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      html += '<button class="filter-option ' + active + '" onclick="setFilterCat(this.dataset.cat)" data-cat="' + safe + '">' + icon + ' ' + label + '</button>';
+    });
+    catOpts.innerHTML = html;
+  }
+  // Update sort buttons
+  ['date','amount','category','person'].forEach(function(s) {
+    var btn = document.getElementById('fsort-' + s);
+    if (btn) btn.classList.toggle('active', currentSort === s);
   });
-  wrap.innerHTML = btns;
+  document.getElementById('filterModal').classList.add('open');
+  // Update filter button style
+  updateFilterBtn();
 }
 
-function setCatFilter(cat) {
-  filterCategory = cat;
-  renderCatFilter();
+function closeFilterModal() {
+  document.getElementById('filterModal').classList.remove('open');
+}
+
+function handleFilterModalClick(e) {
+  if (e.target === e.currentTarget) closeFilterModal();
+}
+
+function setSort(sort) {
+  currentSort = sort;
+  ['date','amount','category','person'].forEach(function(s) {
+    var btn = document.getElementById('fsort-' + s);
+    if (btn) btn.classList.toggle('active', s === sort);
+  });
   renderExpenses();
+  updateFilterBtn();
+}
+
+function setFilterCat(cat) {
+  filterCategory = cat;
+  // Update active state in modal
+  document.querySelectorAll('#catFilterOptions .filter-option').forEach(function(b) {
+    b.classList.toggle('active', (!cat && !b.getAttribute('data-cat')) || b.getAttribute('data-cat') === cat);
+  });
+  renderExpenses();
+  updateFilterBtn();
+}
+
+function clearFilters() {
+  filterCategory = null;
+  currentSort = 'date';
+  renderExpenses();
+  // Reset sort buttons in modal
+  ['date','amount','category','person'].forEach(function(s) {
+    var btn = document.getElementById('fsort-' + s);
+    if (btn) btn.classList.toggle('active', s === 'date');
+  });
+  // Reset cat buttons
+  document.querySelectorAll('#catFilterOptions .filter-option').forEach(function(b) {
+    b.classList.toggle('active', !b.getAttribute('data-cat'));
+  });
+  updateFilterBtn();
+}
+
+function updateFilterBtn() {
+  var btn = document.getElementById('filterToggleBtn');
+  if (!btn) return;
+  var hasFilter = filterCategory || currentSort !== 'date';
+  btn.classList.toggle('active', hasFilter);
+  btn.textContent = hasFilter ? '⚙️ Filtros ativos' : '⚙️ Filtrar';
 }
 
 // ════════════════════════════════════════════
-// WEEKLY SUMMARY
+// INSTALLMENT DELETE
 // ════════════════════════════════════════════
-function updateWeekSummary() {
-  var card = document.getElementById('weekCard');
-  if (!card) return;
+var deletingInstId = null;
+
+function openDelInstModal(id) {
+  deletingInstId = id;
+  var e = expenses.find(function(x) { return x.id === id; });
+  if (!e) return;
+  var desc = document.getElementById('delInstDesc');
+  if (desc) desc.textContent = '"' + e.description + '" — ' + fmtCurrency(e.amount);
+  document.getElementById('delInstModal').classList.add('open');
+}
+
+function closeDelInstModal() {
+  document.getElementById('delInstModal').classList.remove('open');
+  deletingInstId = null;
+}
+
+function confirmDeleteInst(mode) {
+  if (!deletingInstId) return;
+  var expense = expenses.find(function(e) { return e.id === deletingInstId; });
+  if (mode === 'all' && expense && expense.isInstallment) {
+    var baseId = deletingInstId.replace(/_p\d+$/, '');
+    var toDelete = expenses.filter(function(e) { return e.id.indexOf(baseId) === 0; });
+    toDelete.forEach(function(e) {
+      expenses = expenses.filter(function(x) { return x.id !== e.id; });
+      syncDelete(e.id);
+    });
+    showToast('🗑️ ' + toDelete.length + ' parcelas excluídas');
+  } else {
+    expenses = expenses.filter(function(e) { return e.id !== deletingInstId; });
+    syncDelete(deletingInstId);
+    showToast('🗑️ Parcela excluída');
+  }
+  saveToStorage();
+  closeDelInstModal();
+  updateHeader();
+  renderExpenses();
+  renderStats();
+  vibrate([50,30,50]);
+}
+
+// ════════════════════════════════════════════
+// USER SELECT SUMMARY
+// ════════════════════════════════════════════
+function updateUserSelectSummary() {
+  var prefix = getViewMonthPrefix();
+  var months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var vm = getViewMonth();
+  var label = months[vm.month-1] + '/' + vm.year;
+  ['Welinton','Débora'].forEach(function(name) {
+    var userExp = expenses.filter(function(e) { return e.date.startsWith(prefix) && e.person === name; });
+    var total = userExp.reduce(function(s,e) { return s+e.amount; }, 0);
+    var id = name === 'Welinton' ? 'W' : 'D';
+    var el = document.getElementById('userStats' + id);
+    if (el) {
+      el.innerHTML = label + ': <strong>' + fmtCurrency(total) + '</strong><br>' + userExp.length + ' lançamento(s)';
+    }
+  });
+}
+
+// ════════════════════════════════════════════
+// WEEK INFO IN HEADER
+// ════════════════════════════════════════════
+function updateWeekInfo() {
+  var el = document.getElementById('weekHeaderInfo');
+  if (!el) return;
   var now = new Date();
   var today = now.toISOString().split('T')[0];
   var dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
   var weekStart = new Date(now);
   weekStart.setDate(now.getDate() - dayOfWeek);
   var weekStartStr = weekStart.toISOString().split('T')[0];
-  var weekExp = expenses.filter(function(e) { return e.date >= weekStartStr && e.date <= today; });
-  var weekTotal = weekExp.reduce(function(s,e) { return s+e.amount; }, 0);
-  var daysElapsed = dayOfWeek + 1;
-  var avgDay = daysElapsed > 0 ? weekTotal / daysElapsed : 0;
-  var prefix = getViewMonthPrefix();
-  var monthTotal = expenses.filter(function(e) { return e.date.startsWith(prefix); }).reduce(function(s,e) { return s+e.amount; }, 0);
-  var totalCatBudget = Object.values(categoryBudgets).reduce(function(s,v) { return s+v; }, 0);
-  var weekPct = totalCatBudget > 0 ? Math.min((weekTotal / (totalCatBudget / 4)) * 100, 100) : 0;
-  var weekStartLabel = weekStart.toLocaleDateString('pt-BR', {day:'2-digit', month:'short'});
-  var totalEl = document.getElementById('weekTotal');
-  var avgEl = document.getElementById('weekAvg');
-  var subEl = document.getElementById('weekSub');
-  var countEl = document.getElementById('weekCount');
-  var fillEl = document.getElementById('weekBarFill');
-  var infoEl = document.getElementById('weekInfo');
-  if (totalEl) totalEl.textContent = fmtCurrency(weekTotal);
-  if (avgEl) avgEl.textContent = fmtCurrency(avgDay);
-  if (subEl) subEl.textContent = weekStartLabel + ' até hoje';
-  if (countEl) countEl.textContent = weekExp.length + ' lançamento(s)';
-  if (fillEl) fillEl.style.width = weekPct.toFixed(1) + '%';
-  if (infoEl) infoEl.textContent = monthTotal > 0
-    ? ((weekTotal/monthTotal)*100).toFixed(0) + '% do gasto mensal foi esta semana'
-    : 'Nenhum gasto esta semana';
+  var weekTotal = expenses.filter(function(e) { return e.date >= weekStartStr && e.date <= today; })
+    .reduce(function(s,e) { return s+e.amount; }, 0);
+  if (weekTotal > 0) {
+    el.textContent = fmtCurrency(weekTotal) + ' esta semana';
+  } else {
+    el.textContent = '';
+  }
+}
+
+// ════════════════════════════════════════════
+// EXPORT PDF
+// ════════════════════════════════════════════
+function exportPDF() {
+  var data = getReportData();
+  if (!data) return;
+  if (!data.length) { showToast('⚠️ Nenhum dado neste período'); return; }
+  var total = data.reduce(function(s,e) { return s+e.amount; }, 0);
+  var wTotal = data.filter(function(e) { return e.person==='Welinton'; }).reduce(function(s,e) { return s+e.amount; }, 0);
+  var dTotal = data.filter(function(e) { return e.person==='Débora'; }).reduce(function(s,e) { return s+e.amount; }, 0);
+  var title = '';
+  if (reportPeriodTab === 'month') {
+    var parts = document.getElementById('exportMonth').value.split('-');
+    var mNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    title = mNames[parseInt(parts[1])-1] + ' ' + parts[0];
+  } else {
+    title = document.getElementById('exportDateFrom').value + ' a ' + document.getElementById('exportDateTo').value;
+  }
+  var rows = data.map(function(e) {
+    return '<tr><td>' + new Date(e.date+'T12:00:00').toLocaleDateString('pt-BR') + '</td>' +
+      '<td>' + e.person + '</td><td>' + e.categoryIcon + ' ' + e.categoryLabel + '</td>' +
+      '<td>' + e.description + '</td>' +
+      '<td style="text-align:right;font-weight:600;color:#A32D2D">R$ ' + e.amount.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</td></tr>';
+  }).join('');
+  var doc = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>' +
+    '<title>Gastos Familia - ' + title + '</title>' +
+    '<style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1a18;max-width:800px;margin:0 auto}' +
+    'h1{color:#0F6E56;font-size:22px;margin-bottom:4px}.sub{color:#888;font-size:13px;margin-bottom:20px}' +
+    '.sum{display:flex;gap:16px;margin-bottom:20px}.sc{flex:1;padding:12px;border-radius:8px;background:#f4f2eb;text-align:center}' +
+    '.sl{font-size:11px;color:#888;text-transform:uppercase;font-weight:600}.sv{font-size:18px;font-weight:700;margin-top:4px}' +
+    'table{width:100%;border-collapse:collapse;font-size:13px}th{background:#0F6E56;color:#fff;padding:8px 10px;text-align:left}' +
+    'td{padding:7px 10px;border-bottom:1px solid #eee}tr:nth-child(even) td{background:#f9f9f7}' +
+    '.tr td{font-weight:700;background:#E1F5EE;color:#085041}@media print{body{padding:0}}</style>' +
+    '</head><body><h1>Gastos Familia</h1><div class="sub">' + title + '</div>' +
+    '<div class="sum">' +
+    '<div class="sc"><div class="sl">Total</div><div class="sv" style="color:#A32D2D">R$ ' + total.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+    '<div class="sc"><div class="sl">Welinton</div><div class="sv" style="color:#BA7517">R$ ' + wTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+    '<div class="sc"><div class="sl">Debora</div><div class="sv" style="color:#0F6E56">R$ ' + dTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+    '</div><table><thead><tr><th>Data</th><th>Pessoa</th><th>Categoria</th><th>Descricao</th><th>Valor</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody>' +
+    '<tfoot><tr class="tr"><td colspan="4">TOTAL</td><td style="text-align:right">R$ ' + total.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</td></tr></tfoot>' +
+    '</table><p style="margin-top:16px;font-size:11px;color:#aaa">Gerado em ' + new Date().toLocaleDateString('pt-BR') + '</p></body></html>';
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([doc], {type:'text/html;charset=utf-8'}));
+  a.download = 'gastos_' + title.replace(/\s/g,'_') + '.html';
+  a.click();
+  showToast('📄 Abra o arquivo e use Ctrl+P para salvar como PDF');
+}
+
+// ════════════════════════════════════════════
+// EXPORT ALL DATA
+// ════════════════════════════════════════════
+function exportAllData() {
+  if (!expenses.length) { showToast('Nenhum dado para exportar'); return; }
+  var sorted = expenses.slice().sort(function(a,b) { return b.date.localeCompare(a.date); });
+  var lines = ['Data,Pessoa,Categoria,Descricao,Valor,Parcela'];
+  sorted.forEach(function(e) {
+    var parcela = e.isInstallment ? (e.installmentNum + '/' + e.installmentTotal) : 'nao';
+    lines.push(e.date + ',' + e.person + ',' + e.categoryLabel + ',"' + e.description + '",' + e.amount.toFixed(2) + ',' + parcela);
+  });
+  var bom = String.fromCharCode(0xFEFF);
+  var content = bom + lines.join('\n');
+  var blob = new Blob([content], {type: 'text/csv;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'gastos_familia_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+  showToast('Exportados: ' + sorted.length + ' gastos');
 }
 
 // ── Toast ──
@@ -3942,6 +4130,10 @@ window.addEventListener('popstate', function(e) {
   const delCatModal = document.getElementById('delCatModal');
 
   // Fechar qualquer modal aberto
+  const filterModal = document.getElementById('filterModal');
+  if (filterModal && filterModal.classList.contains('open')) { closeFilterModal(); return; }
+  const delInstModal = document.getElementById('delInstModal');
+  if (delInstModal && delInstModal.classList.contains('open')) { closeDelInstModal(); return; }
   const monthPickerModal = document.getElementById('monthPickerModal');
   if (monthPickerModal && monthPickerModal.classList.contains('open')) { closeMonthPicker(); return; }
   if (pwdModal && pwdModal.classList.contains('open')) { closePwdModal(); return; }
