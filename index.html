@@ -560,6 +560,25 @@
     .current-user-badge.w { background: rgba(55,138,221,0.15); color: #185FA5; }
     .current-user-badge.d { background: rgba(127,119,221,0.15); color: #534AB7; }
     .current-user-badge:active { opacity: 0.7; }
+
+    /* ── Sort buttons ── */
+    .sort-wrap { display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+    .sort-btn { padding: 5px 12px; border-radius: 20px; border: 1.5px solid var(--border-strong); background: var(--surface); font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: all 0.15s; flex-shrink: 0; }
+    .sort-btn.active { background: var(--green-500); border-color: var(--green-500); color: #fff; }
+
+    /* ── Category filter ── */
+    .cat-filter-wrap { display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+    .cat-filter-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface); font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+    .cat-filter-btn.active { background: var(--green-50); border-color: var(--green-500); color: var(--green-900); }
+
+    /* ── Weekly card ── */
+    .week-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
+    .week-row { display: flex; justify-content: space-between; align-items: center; }
+    .week-label { font-size: 11px; font-weight: 600; color: var(--text-hint); text-transform: uppercase; letter-spacing: 0.06em; }
+    .week-value { font-size: 18px; font-weight: 700; font-family: var(--mono); color: var(--red-700); }
+    .week-sub { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
+    .week-bar-track { height: 5px; background: var(--gray-100); border-radius: 3px; overflow: hidden; margin: 6px 0 4px; }
+    .week-bar-fill { height: 100%; border-radius: 3px; background: var(--green-500); transition: width 0.4s; }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -692,11 +711,38 @@
         <div style="font-size:11px;color:var(--text-hint)" id="goalInfo"></div>
       </div>
 
-      <!-- Search bar -->
+      <!-- Weekly summary -->
+      <div class="week-card" id="weekCard">
+        <div class="week-row">
+          <div>
+            <div class="week-label">📆 Esta semana</div>
+            <div class="week-value" id="weekTotal">R$ 0,00</div>
+            <div class="week-sub" id="weekSub"></div>
+          </div>
+          <div style="text-align:right">
+            <div class="week-label">Média diária</div>
+            <div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--text-muted)" id="weekAvg">R$ 0,00</div>
+            <div class="week-sub" id="weekCount"></div>
+          </div>
+        </div>
+        <div class="week-bar-track"><div class="week-bar-fill" id="weekBarFill" style="width:0%"></div></div>
+        <div style="font-size:10px;color:var(--text-hint);margin-top:2px" id="weekInfo"></div>
+      </div>
+
+      <!-- Category filter chips -->
+      <div class="cat-filter-wrap" id="catFilterWrap"></div>
+
+      <!-- Search + Sort -->
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" class="search-input" id="searchInput" placeholder="Buscar gastos..." oninput="onSearchInput()" />
         <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+      </div>
+      <div class="sort-wrap">
+        <button class="sort-btn active" id="sort-date" onclick="setSort('date')">📅 Data</button>
+        <button class="sort-btn" id="sort-amount" onclick="setSort('amount')">💰 Valor</button>
+        <button class="sort-btn" id="sort-category" onclick="setSort('category')">🏷️ Categoria</button>
+        <button class="sort-btn" id="sort-person" onclick="setSort('person')">👤 Pessoa</button>
       </div>
 
       <div id="expenseList"></div>
@@ -1504,6 +1550,8 @@ let expenses = [];
 let selectedPerson = 'Welinton';
 let selectedCategory = null;
 let filterPerson_ = 'Todos';
+let filterCategory = null;
+let currentSort = 'date';
 let config = { scriptUrl: '' };
 let budget = 0;
 let editingId = null;
@@ -1919,7 +1967,7 @@ function renderExpenses() {
   const prefix = getViewMonthPrefix();
   let filtered = expenses.filter(e => e.date.startsWith(prefix));
   if (filterPerson_ !== 'Todos') filtered = filtered.filter(e => e.person === filterPerson_);
-  // Search filter
+  if (filterCategory) filtered = filtered.filter(e => e.categoryLabel === filterCategory);
   if (searchQuery) {
     filtered = filtered.filter(e =>
       (e.description || '').toLowerCase().includes(searchQuery) ||
@@ -1928,6 +1976,11 @@ function renderExpenses() {
       String(e.amount).includes(searchQuery)
     );
   }
+  if (currentSort === 'amount') filtered.sort((a,b) => b.amount - a.amount);
+  else if (currentSort === 'category') filtered.sort((a,b) => (a.categoryLabel||'').localeCompare(b.categoryLabel||''));
+  else if (currentSort === 'person') filtered.sort((a,b) => (a.person||'').localeCompare(b.person||''));
+  else filtered.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  renderCatFilter();
 
   if (filtered.length === 0) {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-title">Nenhum gasto ainda</div><div class="empty-desc">Toque no + para adicionar seu primeiro lançamento</div></div>`;
@@ -2062,6 +2115,7 @@ function updateHeader() {
   catAlerts.forEach(a => allAlerts.push(`<div class="budget-alert warn">${a}</div>`));
   updateAlertButton(allAlerts);
   updateSavingsGoal();
+  updateWeekSummary();
 }
 
 // ── Alert toggle ──
@@ -3746,6 +3800,85 @@ function updateUserUI() {
 
   // Set selectedPerson to current user
   selectedPerson = currentUser;
+}
+
+// ════════════════════════════════════════════
+// SORT
+// ════════════════════════════════════════════
+function setSort(sort) {
+  currentSort = sort;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('sort-' + sort);
+  if (btn) btn.classList.add('active');
+  renderExpenses();
+}
+
+// ════════════════════════════════════════════
+// CATEGORY FILTER
+// ════════════════════════════════════════════
+function renderCatFilter() {
+  const wrap = document.getElementById('catFilterWrap');
+  if (!wrap) return;
+  const prefix = getViewMonthPrefix();
+  const monthExp = expenses.filter(e => e.date.startsWith(prefix));
+  const cats = {};
+  monthExp.forEach(e => {
+    if (!cats[e.categoryLabel]) cats[e.categoryLabel] = { icon: e.categoryIcon, count: 0 };
+    cats[e.categoryLabel].count++;
+  });
+  const sorted = Object.entries(cats).sort((a,b) => b[1].count - a[1].count);
+  if (!sorted.length) { wrap.innerHTML = ''; return; }
+  const allActive = !filterCategory ? 'active' : '';
+  let btns = `<button class="cat-filter-btn ${allActive}" onclick="setCatFilter(null)">✨ Todos</button>`;
+  sorted.forEach(([label, d]) => {
+    const active = filterCategory === label ? 'active' : '';
+    const safeLabel = label.replace(/\/g,'\\').replace(/'/g,"\'");
+    btns += `<button class="cat-filter-btn ${active}" onclick="setCatFilter('${safeLabel}')">${d.icon} ${label}</button>`;
+  });
+  wrap.innerHTML = btns;
+}
+
+function setCatFilter(cat) {
+  filterCategory = cat;
+  renderCatFilter();
+  renderExpenses();
+}
+
+// ════════════════════════════════════════════
+// WEEKLY SUMMARY
+// ════════════════════════════════════════════
+function updateWeekSummary() {
+  const card = document.getElementById('weekCard');
+  if (!card) return;
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - dayOfWeek);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+  const weekExp = expenses.filter(e => e.date >= weekStartStr && e.date <= today);
+  const weekTotal = weekExp.reduce((s,e) => s+e.amount, 0);
+  const daysElapsed = dayOfWeek + 1;
+  const avgDay = daysElapsed > 0 ? weekTotal / daysElapsed : 0;
+  const prefix = getViewMonthPrefix();
+  const monthTotal = expenses.filter(e => e.date.startsWith(prefix)).reduce((s,e) => s+e.amount, 0);
+  const totalCatBudget = Object.values(categoryBudgets).reduce((s,v) => s+v, 0);
+  const weekPct = totalCatBudget > 0 ? Math.min((weekTotal / (totalCatBudget / 4)) * 100, 100) : 0;
+  const weekStartLabel = weekStart.toLocaleDateString('pt-BR', {day:'2-digit', month:'short'});
+  const totalEl = document.getElementById('weekTotal');
+  const avgEl = document.getElementById('weekAvg');
+  const subEl = document.getElementById('weekSub');
+  const countEl = document.getElementById('weekCount');
+  const fillEl = document.getElementById('weekBarFill');
+  const infoEl = document.getElementById('weekInfo');
+  if (totalEl) totalEl.textContent = fmtCurrency(weekTotal);
+  if (avgEl) avgEl.textContent = fmtCurrency(avgDay);
+  if (subEl) subEl.textContent = weekStartLabel + ' até hoje';
+  if (countEl) countEl.textContent = weekExp.length + ' lançamento(s)';
+  if (fillEl) fillEl.style.width = weekPct.toFixed(1) + '%';
+  if (infoEl) infoEl.textContent = monthTotal > 0
+    ? ((weekTotal/monthTotal)*100).toFixed(0) + '% do gasto mensal foi esta semana'
+    : 'Nenhum gasto esta semana';
 }
 
 // ── Toast ──
