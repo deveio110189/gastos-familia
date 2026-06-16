@@ -3109,19 +3109,71 @@ function submitRecur() {
     varAmount: recurVarActive
   };
 
+  const recurId = editingRecurId || Date.now().toString(36);
+
   if (editingRecurId) {
+    // Ao editar: remover lançamentos antigos gerados por este recorrente
+    const oldExpenses = expenses.filter(e => e.recurringId === editingRecurId);
+    oldExpenses.forEach(e => {
+      expenses = expenses.filter(x => x.id !== e.id);
+      syncDelete(e.id);
+    });
     const idx = recurringExpenses.findIndex(r => r.id === editingRecurId);
-    if (idx !== -1) recurringExpenses[idx] = { ...recurringExpenses[idx], ...recurData };
+    if (idx !== -1) recurringExpenses[idx] = { ...recurringExpenses[idx], ...recurData, id: recurId };
   } else {
-    recurringExpenses.push({ id: Date.now().toString(36), launchedCount: 0, ...recurData });
+    recurringExpenses.push({ id: recurId, launchedCount: 0, ...recurData });
   }
+
+  // ── Criar lançamentos para todos os meses selecionados ──
+  const monthsToLaunch = totalMonths > 0 ? totalMonths : 24; // indefinido = 24 meses à frente
+  const now2 = new Date();
+
+  for (let m = 0; m < monthsToLaunch; m++) {
+    const targetDate = new Date(now2.getFullYear(), now2.getMonth() + m, 1);
+    const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}`;
+
+    // Respeitar endMonth
+    if (endMonth && targetMonth > endMonth) break;
+
+    // Calcular dia correto (evitar dias inválidos no mês)
+    const daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth()+1, 0).getDate();
+    const actualDay = Math.min(day, daysInMonth);
+    const expDate = `${targetMonth}-${String(actualDay).padStart(2,'0')}`;
+
+    const expId = 'recur_' + recurId + '_' + targetMonth;
+
+    // Não duplicar se já existe
+    if (expenses.some(e => e.id === expId)) continue;
+
+    const newExp = {
+      id: expId,
+      recurringId: recurId,
+      person: selectedRecurPerson,
+      description: desc,
+      amount,
+      category: selectedRecurCategory,
+      categoryLabel: cat.label,
+      categoryIcon: cat.icon,
+      date: expDate,
+      isRecurring: true,
+      createdAt: new Date().toISOString(),
+      synced: false
+    };
+
+    expenses.push(newExp);
+    syncExpense(newExp, 'addExpense');
+  }
+
+  expenses.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  saveToStorage();
   saveRecurring();
   closeRecurModal();
   renderRecurList();
+  updateHeader();
+  renderExpenses();
   vibrate(40);
-  const durLabel = totalMonths === 0 ? 'sem data de término' : `por ${totalMonths} mês(es)`;
-  showToast(`🔄 Gasto fixo salvo — ${durLabel}!`);
-  checkAndLaunchRecurring();
+  const durLabel = totalMonths === 0 ? 'nos próximos 24 meses' : `por ${totalMonths} mês(es)`;
+  showToast(`🔄 Gasto fixo salvo — lançado ${durLabel}!`);
 }
 
 function deleteRecur(id) {
