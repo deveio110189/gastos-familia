@@ -561,21 +561,36 @@
     .current-user-badge.d { background: rgba(127,119,221,0.15); color: #534AB7; }
     .current-user-badge:active { opacity: 0.7; }
 
-    /* ── Filter modal ── */
-    .filter-btn { display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--border-strong);background:var(--surface);font-family:var(--font);font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:all 0.15s;flex-shrink:0; }
+    .filter-btn { display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--border-strong);background:var(--surface);font-family:var(--font);font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:all 0.15s; }
     .filter-btn.active { background:var(--green-50);border-color:var(--green-500);color:var(--green-900); }
     .filter-section-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-hint);margin:16px 0 8px; }
     .filter-options { display:flex;flex-wrap:wrap;gap:6px; }
     .filter-option { padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface-raised);font-family:var(--font);font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer;transition:all 0.15s; }
-    .filter-option.active { background:var(--green-500);border-color:var(--green-500);color:#fff;font-weight:600; }
-
-    /* ── Installment delete options ── */
-    .inst-del-option { display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--surface-raised);cursor:pointer;margin-bottom:8px;transition:all 0.15s; }
-    .inst-del-option:active { border-color:var(--red-500);background:var(--red-50); }
-
-    /* ── User card stats ── */
+    .filter-option.sel { background:var(--green-500);border-color:var(--green-500);color:#fff;font-weight:600; }
+    .inst-del-opt { display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--surface-raised);cursor:pointer;margin-bottom:8px;transition:all 0.15s; }
+    .inst-del-opt:active { border-color:var(--red-500);background:var(--red-50); }
     .user-card-stats { margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6; }
     .user-card-stats strong { color:rgba(255,255,255,0.9);font-family:var(--mono); }
+
+    /* ── Quick launch FAB ── */
+    .quick-launch-overlay { position:fixed;inset:0;z-index:9;background:rgba(0,0,0,0); pointer-events:none; }
+    .quick-launch-overlay.open { pointer-events:all; }
+    .quick-launch-menu { position:fixed;bottom:140px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:10;opacity:0;transform:translateY(20px);transition:all 0.2s;pointer-events:none; }
+    .quick-launch-menu.open { opacity:1;transform:translateY(0);pointer-events:all; }
+    .ql-item { display:flex;align-items:center;gap:8px;padding:8px 14px;background:#fff;border-radius:28px;box-shadow:0 3px 12px rgba(0,0,0,0.18);cursor:pointer;transition:transform 0.15s;white-space:nowrap; }
+    .ql-item:active { transform:scale(0.95); }
+    .ql-item-icon { font-size:20px;line-height:1; }
+    .ql-item-label { font-size:13px;font-weight:700;color:var(--text); }
+    .ql-item-value { font-size:11px;color:var(--text-hint);margin-left:auto;font-family:var(--mono); }
+    .ql-full { background:var(--green-500);color:#fff; }
+    .ql-full .ql-item-label { color:#fff; }
+    /* ── Histórico de exclusões ── */
+    .trash-item { display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border); }
+    .trash-item-info { flex:1;min-width:0; }
+    .trash-item-desc { font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .trash-item-meta { font-size:11px;color:var(--text-hint);margin-top:2px; }
+    .trash-item-amount { font-size:14px;font-weight:700;color:var(--red-700);font-family:var(--mono);flex-shrink:0; }
+    .trash-restore-btn { padding:5px 10px;border-radius:12px;border:1.5px solid var(--green-500);background:none;color:var(--green-700);font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;font-family:var(--font); }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -906,6 +921,17 @@
 
       <div class="config-section">
         <div class="config-section-title">Notificações</div>
+        <div class="card" style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:14px;font-weight:600">Alertas do parceiro</div>
+              <div style="font-size:12px;color:var(--text-hint);margin-top:2px">Notificar quando o parceiro lançar um gasto</div>
+            </div>
+            <div class="toggle-wrap" onclick="togglePartnerAlerts()" id="partnerAlertToggle" style="cursor:pointer">
+              <div class="toggle-track"><div class="toggle-thumb"></div></div>
+            </div>
+          </div>
+        </div>
         <div class="card">
           <div style="display:flex;align-items:center;gap:10px;padding:6px 0">
             <span style="font-size:24px">🔔</span>
@@ -960,13 +986,19 @@
       <div class="config-section">
         <div class="config-section-title">Dados locais</div>
         <button class="btn-secondary" onclick="exportAllData()" style="margin-bottom:8px">⬇️ Exportar todos os dados (CSV)</button>
+        <button class="btn-secondary" onclick="openTrashModal()" style="margin-bottom:8px">🗑️ Lixeira <span id="trashCount" style="background:var(--red-500);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px">0</span></button>
         <button class="btn-danger" onclick="clearData()">🗑️ Limpar dados locais</button>
       </div>
     </div>
   </div>
 
   <!-- FAB -->
-  <button class="fab" onclick="openAddModal()" aria-label="Novo gasto">
+  <!-- Quick Launch Overlay -->
+  <div class="quick-launch-overlay" id="qlOverlay" onclick="closeQuickLaunch()"></div>
+  <!-- Quick Launch Menu -->
+  <div class="quick-launch-menu" id="qlMenu"></div>
+
+  <button class="fab" id="fabBtn" onclick="toggleQuickLaunch()" aria-label="Novo gasto">
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 5v14M5 12h14" stroke="white" stroke-linecap="round"/>
     </svg>
@@ -1170,22 +1202,19 @@
   </div>
 
   <!-- Filter Modal -->
-  <div class="modal-overlay" id="filterModal" onclick="handleFilterModalClick(event)">
+  <div class="modal-overlay" id="filterModal" onclick="if(event.target===this)closeFilterModal()">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-title">Filtrar e ordenar</div>
-
       <div class="filter-section-title">Ordenar por</div>
       <div class="filter-options">
-        <button class="filter-option active" id="fsort-date" onclick="setSort('date')">📅 Data</button>
+        <button class="filter-option sel" id="fsort-date" onclick="setSort('date')">📅 Data</button>
         <button class="filter-option" id="fsort-amount" onclick="setSort('amount')">💰 Maior valor</button>
         <button class="filter-option" id="fsort-category" onclick="setSort('category')">🏷️ Categoria</button>
         <button class="filter-option" id="fsort-person" onclick="setSort('person')">👤 Pessoa</button>
       </div>
-
       <div class="filter-section-title">Categoria</div>
       <div class="filter-options" id="catFilterOptions"></div>
-
       <div style="margin-top:20px;display:flex;gap:8px">
         <button class="btn-secondary" style="flex:1;margin-bottom:0" onclick="clearFilters()">Limpar filtros</button>
         <button class="btn-primary" style="flex:1" onclick="closeFilterModal()">Aplicar</button>
@@ -1198,14 +1227,14 @@
     <div class="del-modal-box">
       <div class="del-modal-title">🗑️ Excluir parcela?</div>
       <div class="del-modal-desc" id="delInstDesc"></div>
-      <div class="inst-del-option" onclick="confirmDeleteInst('single')">
+      <div class="inst-del-opt" onclick="confirmDeleteInst('single')">
         <span style="font-size:20px">1️⃣</span>
         <div>
           <div style="font-size:14px;font-weight:700">Só esta parcela</div>
           <div style="font-size:12px;color:var(--text-hint);margin-top:2px">As outras permanecem</div>
         </div>
       </div>
-      <div class="inst-del-option" onclick="confirmDeleteInst('all')">
+      <div class="inst-del-opt" onclick="confirmDeleteInst('all')">
         <span style="font-size:20px">🗑️</span>
         <div>
           <div style="font-size:14px;font-weight:700">Todas as parcelas</div>
@@ -1230,6 +1259,19 @@
         <label class="form-label">Ou escolha um mês específico</label>
         <input type="month" class="text-input" id="monthPickerInput" onchange="applyMonthPicker()" />
       </div>
+    </div>
+  </div>
+
+  <!-- Trash Modal -->
+  <div class="modal-overlay" id="trashModal" onclick="if(event.target===this)closeTrashModal()">
+    <div class="modal-sheet" style="max-height:75dvh">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="modal-title" style="margin-bottom:0">🗑️ Lixeira</div>
+        <button onclick="clearTrash()" style="font-size:12px;color:var(--red-600);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:600">Esvaziar</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-hint);margin-bottom:12px">Gastos excluídos nos últimos 30 dias</div>
+      <div id="trashList" style="overflow-y:auto;max-height:50dvh"></div>
     </div>
   </div>
 
@@ -1420,6 +1462,7 @@ function getFB() { return window._fb; }
 
 // Bridge: called by Firebase module when expenses update
 window.onFirebaseExpenses = function(remoteExpenses) {
+  checkPartnerNewExpenses(remoteExpenses);
   let added = 0, updated = 0, removed = 0;
   remoteExpenses.forEach(function(remote) {
     if (!remote.id) return;
@@ -1896,6 +1939,8 @@ function closeDelModal() { document.getElementById('delModal').classList.remove(
 function confirmDelete() {
   if (!deletingId) return;
   const idToDelete = deletingId;
+  const expToDelete = expenses.find(e => e.id === idToDelete);
+  if (expToDelete) addToTrash(expToDelete);
   expenses = expenses.filter(e => e.id !== idToDelete);
   saveToStorage();
   closeDelModal();
@@ -3827,63 +3872,54 @@ function updateUserUI() {
   selectedPerson = currentUser;
 }
 
-// ════════════════════════════════════════════
-// FILTER MODAL
-// ════════════════════════════════════════════
+// ════ FILTER MODAL ════
 function openFilterModal() {
-  // Populate category options
   var prefix = getViewMonthPrefix();
   var monthExp = expenses.filter(function(e) { return e.date.startsWith(prefix); });
   var cats = {};
   monthExp.forEach(function(e) {
-    if (!cats[e.categoryLabel]) cats[e.categoryLabel] = e.categoryIcon;
+    if (!cats[e.categoryLabel]) cats[e.categoryLabel] = e.categoryIcon || '';
   });
   var catOpts = document.getElementById('catFilterOptions');
   if (catOpts) {
-    var allActive = !filterCategory ? 'active' : '';
-    var html = '<button class="filter-option ' + allActive + '" onclick="setFilterCat(null)">✨ Todas</button>';
-    Object.entries(cats).forEach(function(entry) {
-      var label = entry[0];
-      var icon = entry[1];
-      var active = filterCategory === label ? 'active' : '';
-      var safe = label.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-      html += '<button class="filter-option ' + active + '" onclick="setFilterCat(this.dataset.cat)" data-cat="' + safe + '">' + icon + ' ' + label + '</button>';
+    var allSel = !filterCategory ? 'sel' : '';
+    var out = '<button class="filter-option ' + allSel + '" onclick="setFilterCat(null)">\u2728 Todas</button>';
+    Object.keys(cats).forEach(function(label) {
+      var icon = cats[label];
+      var isSel = filterCategory === label ? 'sel' : '';
+      var safe = label.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+      out += '<button class="filter-option ' + isSel + '" data-cat="' + safe + '" onclick="setFilterCat(this.dataset.cat)">' + icon + ' ' + label + '</button>';
     });
-    catOpts.innerHTML = html;
+    catOpts.innerHTML = out;
   }
-  // Update sort buttons
   ['date','amount','category','person'].forEach(function(s) {
     var btn = document.getElementById('fsort-' + s);
-    if (btn) btn.classList.toggle('active', currentSort === s);
+    if (btn) { btn.className = 'filter-option' + (currentSort === s ? ' sel' : ''); }
   });
   document.getElementById('filterModal').classList.add('open');
-  // Update filter button style
   updateFilterBtn();
 }
 
 function closeFilterModal() {
-  document.getElementById('filterModal').classList.remove('open');
-}
-
-function handleFilterModalClick(e) {
-  if (e.target === e.currentTarget) closeFilterModal();
+  var m = document.getElementById('filterModal');
+  if (m) m.classList.remove('open');
 }
 
 function setSort(sort) {
   currentSort = sort;
   ['date','amount','category','person'].forEach(function(s) {
     var btn = document.getElementById('fsort-' + s);
-    if (btn) btn.classList.toggle('active', s === sort);
+    if (btn) btn.className = 'filter-option' + (s === sort ? ' sel' : '');
   });
   renderExpenses();
   updateFilterBtn();
 }
 
 function setFilterCat(cat) {
-  filterCategory = cat;
-  // Update active state in modal
+  filterCategory = cat || null;
   document.querySelectorAll('#catFilterOptions .filter-option').forEach(function(b) {
-    b.classList.toggle('active', (!cat && !b.getAttribute('data-cat')) || b.getAttribute('data-cat') === cat);
+    var bcat = b.getAttribute('data-cat');
+    b.className = 'filter-option' + ((!cat && !bcat) || bcat === cat ? ' sel' : '');
   });
   renderExpenses();
   updateFilterBtn();
@@ -3893,14 +3929,12 @@ function clearFilters() {
   filterCategory = null;
   currentSort = 'date';
   renderExpenses();
-  // Reset sort buttons in modal
   ['date','amount','category','person'].forEach(function(s) {
     var btn = document.getElementById('fsort-' + s);
-    if (btn) btn.classList.toggle('active', s === 'date');
+    if (btn) btn.className = 'filter-option' + (s === 'date' ? ' sel' : '');
   });
-  // Reset cat buttons
   document.querySelectorAll('#catFilterOptions .filter-option').forEach(function(b) {
-    b.classList.toggle('active', !b.getAttribute('data-cat'));
+    b.className = 'filter-option' + (!b.getAttribute('data-cat') ? ' sel' : '');
   });
   updateFilterBtn();
 }
@@ -3909,13 +3943,11 @@ function updateFilterBtn() {
   var btn = document.getElementById('filterToggleBtn');
   if (!btn) return;
   var hasFilter = filterCategory || currentSort !== 'date';
-  btn.classList.toggle('active', hasFilter);
-  btn.textContent = hasFilter ? '⚙️ Filtros ativos' : '⚙️ Filtrar';
+  btn.className = 'filter-btn' + (hasFilter ? ' active' : '');
+  btn.textContent = hasFilter ? '\u2699\uFE0F Filtros ativos' : '\u2699\uFE0F Filtrar';
 }
 
-// ════════════════════════════════════════════
-// INSTALLMENT DELETE
-// ════════════════════════════════════════════
+// ════ INSTALLMENT DELETE ════
 var deletingInstId = null;
 
 function openDelInstModal(id) {
@@ -3923,12 +3955,13 @@ function openDelInstModal(id) {
   var e = expenses.find(function(x) { return x.id === id; });
   if (!e) return;
   var desc = document.getElementById('delInstDesc');
-  if (desc) desc.textContent = '"' + e.description + '" — ' + fmtCurrency(e.amount);
+  if (desc) desc.textContent = '"' + e.description + '" \u2014 ' + fmtCurrency(e.amount);
   document.getElementById('delInstModal').classList.add('open');
 }
 
 function closeDelInstModal() {
-  document.getElementById('delInstModal').classList.remove('open');
+  var m = document.getElementById('delInstModal');
+  if (m) m.classList.remove('open');
   deletingInstId = null;
 }
 
@@ -3936,17 +3969,18 @@ function confirmDeleteInst(mode) {
   if (!deletingInstId) return;
   var expense = expenses.find(function(e) { return e.id === deletingInstId; });
   if (mode === 'all' && expense && expense.isInstallment) {
-    var baseId = deletingInstId.replace(/_p\d+$/, '');
+    var baseId = deletingInstId.replace(/_p[0-9]+$/, '');
     var toDelete = expenses.filter(function(e) { return e.id.indexOf(baseId) === 0; });
     toDelete.forEach(function(e) {
+      addToTrash(e);
       expenses = expenses.filter(function(x) { return x.id !== e.id; });
       syncDelete(e.id);
     });
-    showToast('🗑️ ' + toDelete.length + ' parcelas excluídas');
+    showToast('\uD83D\uDDD1\uFE0F ' + toDelete.length + ' parcelas exclu\u00EDdas');
   } else {
     expenses = expenses.filter(function(e) { return e.id !== deletingInstId; });
     syncDelete(deletingInstId);
-    showToast('🗑️ Parcela excluída');
+    showToast('\uD83D\uDDD1\uFE0F Parcela exclu\u00EDda');
   }
   saveToStorage();
   closeDelInstModal();
@@ -3956,72 +3990,62 @@ function confirmDeleteInst(mode) {
   vibrate([50,30,50]);
 }
 
-// ════════════════════════════════════════════
-// USER SELECT SUMMARY
-// ════════════════════════════════════════════
+// ════ USER SELECT SUMMARY ════
 function updateUserSelectSummary() {
   var prefix = getViewMonthPrefix();
-  var months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   var vm = getViewMonth();
-  var label = months[vm.month-1] + '/' + vm.year;
-  ['Welinton','Débora'].forEach(function(name) {
+  var mnames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var label = mnames[vm.month-1] + '/' + vm.year;
+  ['Welinton','D\u00E9bora'].forEach(function(name) {
     var userExp = expenses.filter(function(e) { return e.date.startsWith(prefix) && e.person === name; });
     var total = userExp.reduce(function(s,e) { return s+e.amount; }, 0);
     var id = name === 'Welinton' ? 'W' : 'D';
     var el = document.getElementById('userStats' + id);
     if (el) {
-      el.innerHTML = label + ': <strong>' + fmtCurrency(total) + '</strong><br>' + userExp.length + ' lançamento(s)';
+      el.innerHTML = label + ': <strong>' + fmtCurrency(total) + '</strong><br>' + userExp.length + ' lan\u00E7amento(s)';
     }
   });
 }
 
-// ════════════════════════════════════════════
-// WEEK INFO IN HEADER
-// ════════════════════════════════════════════
+// ════ WEEK INFO NO HEADER ════
 function updateWeekInfo() {
   var el = document.getElementById('weekHeaderInfo');
   if (!el) return;
   var now = new Date();
-  var today = now.toISOString().split('T')[0];
-  var dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
-  var weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - dayOfWeek);
-  var weekStartStr = weekStart.toISOString().split('T')[0];
-  var weekTotal = expenses.filter(function(e) { return e.date >= weekStartStr && e.date <= today; })
+  var y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+  var today = y + '-' + String(mo+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+  var dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  var ws = new Date(y, mo, d - dow);
+  var weekStartStr = ws.getFullYear() + '-' + String(ws.getMonth()+1).padStart(2,'0') + '-' + String(ws.getDate()).padStart(2,'0');
+  var wTotal = expenses.filter(function(e) { return e.date >= weekStartStr && e.date <= today; })
     .reduce(function(s,e) { return s+e.amount; }, 0);
-  if (weekTotal > 0) {
-    el.textContent = fmtCurrency(weekTotal) + ' esta semana';
-  } else {
-    el.textContent = '';
-  }
+  el.textContent = wTotal > 0 ? fmtCurrency(wTotal) + ' esta semana' : '';
 }
 
-// ════════════════════════════════════════════
-// EXPORT PDF
-// ════════════════════════════════════════════
+// ════ EXPORT PDF ════
 function exportPDF() {
   var data = getReportData();
   if (!data) return;
-  if (!data.length) { showToast('⚠️ Nenhum dado neste período'); return; }
+  if (!data.length) { showToast('\u26A0\uFE0F Nenhum dado neste per\u00EDodo'); return; }
   var total = data.reduce(function(s,e) { return s+e.amount; }, 0);
   var wTotal = data.filter(function(e) { return e.person==='Welinton'; }).reduce(function(s,e) { return s+e.amount; }, 0);
-  var dTotal = data.filter(function(e) { return e.person==='Débora'; }).reduce(function(s,e) { return s+e.amount; }, 0);
+  var dTotal = data.filter(function(e) { return e.person==='D\u00E9bora'; }).reduce(function(s,e) { return s+e.amount; }, 0);
   var title = '';
   if (reportPeriodTab === 'month') {
     var parts = document.getElementById('exportMonth').value.split('-');
-    var mNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    var mNames = ['Janeiro','Fevereiro','Mar\u00E7o','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
     title = mNames[parseInt(parts[1])-1] + ' ' + parts[0];
   } else {
     title = document.getElementById('exportDateFrom').value + ' a ' + document.getElementById('exportDateTo').value;
   }
   var rows = data.map(function(e) {
     return '<tr><td>' + new Date(e.date+'T12:00:00').toLocaleDateString('pt-BR') + '</td>' +
-      '<td>' + e.person + '</td><td>' + e.categoryIcon + ' ' + e.categoryLabel + '</td>' +
+      '<td>' + e.person + '</td><td>' + (e.categoryIcon||'') + ' ' + e.categoryLabel + '</td>' +
       '<td>' + e.description + '</td>' +
       '<td style="text-align:right;font-weight:600;color:#A32D2D">R$ ' + e.amount.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</td></tr>';
   }).join('');
-  var doc = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>' +
-    '<title>Gastos Familia - ' + title + '</title>' +
+  var fmtR = function(v) { return 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2}); };
+  var doc = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><title>Gastos - ' + title + '</title>' +
     '<style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1a18;max-width:800px;margin:0 auto}' +
     'h1{color:#0F6E56;font-size:22px;margin-bottom:4px}.sub{color:#888;font-size:13px;margin-bottom:20px}' +
     '.sum{display:flex;gap:16px;margin-bottom:20px}.sc{flex:1;padding:12px;border-radius:8px;background:#f4f2eb;text-align:center}' +
@@ -4029,25 +4053,23 @@ function exportPDF() {
     'table{width:100%;border-collapse:collapse;font-size:13px}th{background:#0F6E56;color:#fff;padding:8px 10px;text-align:left}' +
     'td{padding:7px 10px;border-bottom:1px solid #eee}tr:nth-child(even) td{background:#f9f9f7}' +
     '.tr td{font-weight:700;background:#E1F5EE;color:#085041}@media print{body{padding:0}}</style>' +
-    '</head><body><h1>Gastos Familia</h1><div class="sub">' + title + '</div>' +
+    '</head><body><h1>Gastos Fam\u00EDlia</h1><div class="sub">' + title + '</div>' +
     '<div class="sum">' +
-    '<div class="sc"><div class="sl">Total</div><div class="sv" style="color:#A32D2D">R$ ' + total.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
-    '<div class="sc"><div class="sl">Welinton</div><div class="sv" style="color:#BA7517">R$ ' + wTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
-    '<div class="sc"><div class="sl">Debora</div><div class="sv" style="color:#0F6E56">R$ ' + dTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
-    '</div><table><thead><tr><th>Data</th><th>Pessoa</th><th>Categoria</th><th>Descricao</th><th>Valor</th></tr></thead>' +
+    '<div class="sc"><div class="sl">Total</div><div class="sv" style="color:#A32D2D">' + fmtR(total) + '</div></div>' +
+    '<div class="sc"><div class="sl">Welinton</div><div class="sv" style="color:#BA7517">' + fmtR(wTotal) + '</div></div>' +
+    '<div class="sc"><div class="sl">D\u00E9bora</div><div class="sv" style="color:#0F6E56">' + fmtR(dTotal) + '</div></div>' +
+    '</div><table><thead><tr><th>Data</th><th>Pessoa</th><th>Categoria</th><th>Descri\u00E7\u00E3o</th><th>Valor</th></tr></thead>' +
     '<tbody>' + rows + '</tbody>' +
-    '<tfoot><tr class="tr"><td colspan="4">TOTAL</td><td style="text-align:right">R$ ' + total.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</td></tr></tfoot>' +
+    '<tfoot><tr class="tr"><td colspan="4">TOTAL</td><td style="text-align:right">' + fmtR(total) + '</td></tr></tfoot>' +
     '</table><p style="margin-top:16px;font-size:11px;color:#aaa">Gerado em ' + new Date().toLocaleDateString('pt-BR') + '</p></body></html>';
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([doc], {type:'text/html;charset=utf-8'}));
   a.download = 'gastos_' + title.replace(/\s/g,'_') + '.html';
   a.click();
-  showToast('📄 Abra o arquivo e use Ctrl+P para salvar como PDF');
+  showToast('\uD83D\uDCC4 Abra o arquivo e use Ctrl+P para salvar como PDF');
 }
 
-// ════════════════════════════════════════════
-// EXPORT ALL DATA
-// ════════════════════════════════════════════
+// ════ EXPORT ALL DATA ════
 function exportAllData() {
   if (!expenses.length) { showToast('Nenhum dado para exportar'); return; }
   var sorted = expenses.slice().sort(function(a,b) { return b.date.localeCompare(a.date); });
@@ -4058,12 +4080,185 @@ function exportAllData() {
   });
   var bom = String.fromCharCode(0xFEFF);
   var content = bom + lines.join('\n');
-  var blob = new Blob([content], {type: 'text/csv;charset=utf-8'});
   var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = URL.createObjectURL(new Blob([content], {type:'text/csv;charset=utf-8'}));
   a.download = 'gastos_familia_' + new Date().toISOString().split('T')[0] + '.csv';
   a.click();
   showToast('Exportados: ' + sorted.length + ' gastos');
+}
+
+
+// ════ ITEM 6: QUICK LAUNCH ════
+var qlOpen = false;
+
+function toggleQuickLaunch() {
+  if (qlOpen) { closeQuickLaunch(); return; }
+  var prefix = getViewMonthPrefix();
+  var monthExp = expenses.filter(function(e) { return e.date.startsWith(prefix); });
+  var counts = {};
+  monthExp.forEach(function(e) { counts[e.category] = (counts[e.category]||0)+1; });
+  var top3 = Object.entries(counts).sort(function(a,b){return b[1]-a[1];}).slice(0,3).map(function(x){return x[0];});
+  var allCats = getAllCategories();
+  var menu = document.getElementById('qlMenu');
+  if (!menu) return;
+  var html = '';
+  // Top categorias com ultimo valor
+  top3.forEach(function(catId) {
+    var cat = allCats.find(function(c){return c.id===catId;});
+    if (!cat) return;
+    var lastExp = monthExp.filter(function(e){return e.category===catId;}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+    var lastVal = lastExp ? fmtCurrency(lastExp.amount) : '';
+    html += '<div class="ql-item" onclick="quickLaunch(\'' + catId + '\')">' +
+      '<span class="ql-item-icon">' + cat.icon + '</span>' +
+      '<span class="ql-item-label">' + cat.label + '</span>' +
+      (lastVal ? '<span class="ql-item-value">' + lastVal + '</span>' : '') +
+      '</div>';
+  });
+  // Botao modal completo
+  html += '<div class="ql-item ql-full" onclick="closeQuickLaunch();openAddModal()">' +
+    '<span class="ql-item-icon">+</span>' +
+    '<span class="ql-item-label">Novo gasto completo</span>' +
+    '</div>';
+  menu.innerHTML = html;
+  menu.classList.add('open');
+  document.getElementById('qlOverlay').classList.add('open');
+  qlOpen = true;
+}
+
+function closeQuickLaunch() {
+  var menu = document.getElementById('qlMenu');
+  var overlay = document.getElementById('qlOverlay');
+  if (menu) menu.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+  qlOpen = false;
+}
+
+function quickLaunch(catId) {
+  closeQuickLaunch();
+  openAddModal();
+  setTimeout(function() {
+    selectCategory(catId);
+    var amtEl = document.getElementById('amountInput');
+    if (amtEl) { amtEl.value = ''; amtEl.focus(); }
+  }, 400);
+}
+
+// ════ ITEM 7: LIXEIRA ════
+var deletedExpenses = JSON.parse(localStorage.getItem('fin_trash') || '[]');
+
+function saveTrash() {
+  // Manter apenas os últimos 30 dias
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  var cutStr = cutoff.toISOString().split('T')[0];
+  deletedExpenses = deletedExpenses.filter(function(e) { return (e.deletedAt||'') >= cutStr; });
+  localStorage.setItem('fin_trash', JSON.stringify(deletedExpenses));
+  updateTrashCount();
+}
+
+function addToTrash(expense) {
+  var copy = JSON.parse(JSON.stringify(expense));
+  copy.deletedAt = new Date().toISOString().split('T')[0];
+  deletedExpenses.unshift(copy);
+  saveTrash();
+}
+
+function updateTrashCount() {
+  var el = document.getElementById('trashCount');
+  if (el) el.textContent = deletedExpenses.length;
+}
+
+function openTrashModal() {
+  renderTrashList();
+  document.getElementById('trashModal').classList.add('open');
+}
+
+function closeTrashModal() {
+  document.getElementById('trashModal').classList.remove('open');
+}
+
+function renderTrashList() {
+  var list = document.getElementById('trashList');
+  if (!list) return;
+  if (!deletedExpenses.length) {
+    list.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-hint)">Lixeira vazia</div>';
+    return;
+  }
+  var mnames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  list.innerHTML = deletedExpenses.map(function(e, i) {
+    var d = e.date ? new Date(e.date+'T12:00:00') : new Date();
+    var dStr = d.getDate() + ' ' + mnames[d.getMonth()] + ' ' + d.getFullYear();
+    return '<div class="trash-item">' +
+      '<div class="trash-item-info">' +
+        '<div class="trash-item-desc">' + (e.categoryIcon||'') + ' ' + e.description + '</div>' +
+        '<div class="trash-item-meta">' + e.person + ' &bull; ' + dStr + '</div>' +
+      '</div>' +
+      '<div class="trash-item-amount">' + fmtCurrency(e.amount) + '</div>' +
+      '<button class="trash-restore-btn" onclick="restoreExpense(' + i + ')">Restaurar</button>' +
+      '</div>';
+  }).join('');
+}
+
+function restoreExpense(index) {
+  var expense = deletedExpenses[index];
+  if (!expense) return;
+  delete expense.deletedAt;
+  expenses.push(expense);
+  expenses.sort(function(a,b){return b.date.localeCompare(a.date);});
+  saveToStorage();
+  syncExpense(expense, 'addExpense');
+  deletedExpenses.splice(index, 1);
+  saveTrash();
+  renderTrashList();
+  updateHeader();
+  renderExpenses();
+  showToast('\u2705 Gasto restaurado!');
+}
+
+function clearTrash() {
+  deletedExpenses = [];
+  localStorage.removeItem('fin_trash');
+  updateTrashCount();
+  renderTrashList();
+  showToast('Lixeira esvaziada');
+}
+
+// ════ ITEM 8: ALERTAS DO PARCEIRO ════
+var partnerAlertsEnabled = localStorage.getItem('fin_partner_alerts') === 'true';
+var lastKnownExpenseIds = null;
+
+function togglePartnerAlerts() {
+  partnerAlertsEnabled = !partnerAlertsEnabled;
+  localStorage.setItem('fin_partner_alerts', partnerAlertsEnabled);
+  updatePartnerAlertToggle();
+  showToast(partnerAlertsEnabled ? '\uD83D\uDD14 Alertas do parceiro ativados' : 'Alertas do parceiro desativados');
+}
+
+function updatePartnerAlertToggle() {
+  var toggle = document.getElementById('partnerAlertToggle');
+  if (!toggle) return;
+  var track = toggle.querySelector('.toggle-track');
+  if (track) track.style.background = partnerAlertsEnabled ? 'var(--green-500)' : 'var(--gray-300)';
+}
+
+function checkPartnerNewExpenses(remoteExpenses) {
+  if (!partnerAlertsEnabled || !currentUser) return;
+  if (lastKnownExpenseIds === null) {
+    lastKnownExpenseIds = new Set(Object.keys(remoteExpenses || {}));
+    return;
+  }
+  var newIds = Object.keys(remoteExpenses || {}).filter(function(id) {
+    return !lastKnownExpenseIds.has(id);
+  });
+  newIds.forEach(function(id) {
+    var exp = remoteExpenses[id];
+    if (exp && exp.person && exp.person !== currentUser) {
+      var msg = '\uD83D\uDCB8 ' + exp.person + ' lan\u00E7ou ' + fmtCurrency(exp.amount||0) + ' em ' + (exp.categoryLabel||'');
+      showToast(msg, 4000);
+      vibrate([80,40,80]);
+    }
+  });
+  lastKnownExpenseIds = new Set(Object.keys(remoteExpenses || {}));
 }
 
 // ── Toast ──
@@ -4132,6 +4327,8 @@ window.addEventListener('popstate', function(e) {
   // Fechar qualquer modal aberto
   const filterModal = document.getElementById('filterModal');
   if (filterModal && filterModal.classList.contains('open')) { closeFilterModal(); return; }
+  const trashModal = document.getElementById('trashModal');
+  if (trashModal && trashModal.classList.contains('open')) { closeTrashModal(); return; }
   const delInstModal = document.getElementById('delInstModal');
   if (delInstModal && delInstModal.classList.contains('open')) { closeDelInstModal(); return; }
   const monthPickerModal = document.getElementById('monthPickerModal');
