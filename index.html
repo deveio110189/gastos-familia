@@ -591,6 +591,15 @@
     .trash-item-meta { font-size:11px;color:var(--text-hint);margin-top:2px; }
     .trash-item-amount { font-size:14px;font-weight:700;color:var(--red-700);font-family:var(--mono);flex-shrink:0; }
     .trash-restore-btn { padding:5px 10px;border-radius:12px;border:1.5px solid var(--green-500);background:none;color:var(--green-700);font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;font-family:var(--font); }
+
+    /* ── Pending recurring ── */
+    .pending-recur-card { background:var(--amber-50);border:1.5px solid var(--amber-300);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all 0.15s; }
+    .pending-recur-card:active { transform:scale(0.98); }
+    .pending-recur-icon { font-size:22px;flex-shrink:0; }
+    .pending-recur-info { flex:1;min-width:0; }
+    .pending-recur-title { font-size:14px;font-weight:700;color:var(--amber-900); }
+    .pending-recur-sub { font-size:12px;color:var(--amber-700);margin-top:2px; }
+    .pending-recur-btn { padding:6px 14px;border-radius:20px;background:var(--amber-500);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);flex-shrink:0; }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -1273,6 +1282,55 @@
       </div>
       <div style="font-size:12px;color:var(--text-hint);margin-bottom:12px">Gastos excluídos nos últimos 30 dias</div>
       <div id="trashList" style="overflow-y:auto;max-height:50dvh"></div>
+    </div>
+  </div>
+
+  <!-- Pending Recurring Value Modal -->
+  <div class="modal-overlay" id="pendingValueModal" onclick="if(event.target===this)closePendingValueModal()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="pendingValueTitle">Informar valor</div>
+      <div style="font-size:13px;color:var(--text-hint);margin-bottom:16px" id="pendingValueDesc"></div>
+      <div class="form-group">
+        <label class="form-label">Valor deste mês</label>
+        <div class="amount-input-wrap">
+          <span class="currency-prefix">R$</span>
+          <input type="text" class="amount-input" id="pendingValueInput" placeholder="0,00" inputmode="numeric" />
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-secondary" style="flex:1;margin-bottom:0" onclick="closePendingValueModal()">Cancelar</button>
+        <button class="btn-primary" style="flex:1" onclick="confirmPendingValue()">✅ Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Make Recurring Modal -->
+  <div class="modal-overlay" id="makeRecurModal" onclick="if(event.target===this)closeMakeRecurModal()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">&#128257; Tornar gasto fixo</div>
+      <div style="font-size:13px;color:var(--text-hint);margin-bottom:16px" id="makeRecurDesc"></div>
+      <div class="form-group">
+        <label class="form-label">Por quantos meses?</label>
+        <div class="duration-grid">
+          <div class="duration-chip selected" id="mkdur-0" onclick="selectMkDuration(0)"><div class="duration-chip-num">&#8734;</div><div class="duration-chip-label">Sempre</div></div>
+          <div class="duration-chip" id="mkdur-3" onclick="selectMkDuration(3)"><div class="duration-chip-num">3</div><div class="duration-chip-label">meses</div></div>
+          <div class="duration-chip" id="mkdur-6" onclick="selectMkDuration(6)"><div class="duration-chip-num">6</div><div class="duration-chip-label">meses</div></div>
+          <div class="duration-chip" id="mkdur-12" onclick="selectMkDuration(12)"><div class="duration-chip-num">12</div><div class="duration-chip-label">meses</div></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Valor nos proximos meses</label>
+        <div class="installment-toggle" id="mkVarToggle" onclick="toggleMkVar()" style="padding:10px 12px">
+          <span style="font-size:16px">&#128221;</span>
+          <span class="installment-toggle-label">Valor variavel - informar todo mes</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-secondary" style="flex:1;margin-bottom:0" onclick="closeMakeRecurModal()">Cancelar</button>
+        <button class="btn-primary" style="flex:1" onclick="confirmMakeRecur()">&#9989; Confirmar</button>
+      </div>
     </div>
   </div>
 
@@ -2064,8 +2122,26 @@ function renderExpenses() {
     return;
   }
 
+  // Show pending recurring cards at top
+  const pendingRecur = filtered.filter(e => e.isPendingValue);
+  const nonPending = filtered.filter(e => !e.isPendingValue);
+
+  let pendingHtml = '';
+  if (pendingRecur.length > 0) {
+    pendingHtml = '<div class="section-date">⏳ Aguardando valor</div>' +
+      pendingRecur.map(e => `
+        <div class="pending-recur-card" onclick="openPendingValueModal('${e.id}')">
+          <div class="pending-recur-icon">${e.categoryIcon}</div>
+          <div class="pending-recur-info">
+            <div class="pending-recur-title">${e.description}</div>
+            <div class="pending-recur-sub">${e.person} · ${e.categoryLabel}</div>
+          </div>
+          <button class="pending-recur-btn" onclick="event.stopPropagation();openPendingValueModal('${e.id}')">Informar valor</button>
+        </div>`).join('');
+  }
+
   const grouped = {};
-  filtered.forEach(e => { if (!grouped[e.date]) grouped[e.date] = []; grouped[e.date].push(e); });
+  nonPending.forEach(e => { if (!grouped[e.date]) grouped[e.date] = []; grouped[e.date].push(e); });
 
   const today = new Date().toISOString().split('T')[0];
   const yesterday = new Date(Date.now()-86400000).toISOString().split('T')[0];
@@ -2085,6 +2161,7 @@ function renderExpenses() {
         <div class="expense-right">
           <div class="expense-amount">-${fmtCurrency(e.amount)}</div>
           <div class="expense-actions">
+            ${!e.isRecurring && !e.isInstallment ? '<button class="expense-action-btn" onclick="openMakeRecurModal(\'' + e.id + '\')" title="Tornar fixo" style="font-size:10px">&#128257;</button>' : ''}
             <button class="expense-action-btn" onclick="openAddModal('${e.id}')" title="Editar">✏️</button>
             <button class="expense-action-btn del" onclick="openDelModal('${e.id}')" title="Excluir">🗑️</button>
           </div>
@@ -2092,53 +2169,81 @@ function renderExpenses() {
       </div>`;
   }
 
-  list.innerHTML = Object.entries(grouped).sort(([a],[b]) => b.localeCompare(a)).map(([date, items]) => {
+  const groupedHtml = Object.entries(grouped).sort(([a],[b]) => b.localeCompare(a)).map(([date, items]) => {
     const d = new Date(date + 'T12:00:00');
     let label = date === today ? 'Hoje' : date === yesterday ? 'Ontem' : d.toLocaleDateString('pt-BR', {weekday:'short', day:'numeric', month:'short'});
 
-    // Separate installments on day 01 from regular expenses
     const isFirstOfMonth = date.endsWith('-01');
     const installments = isFirstOfMonth ? items.filter(e => e.isInstallment && e.installmentNum > 1) : [];
-    const regular = isFirstOfMonth ? items.filter(e => !(e.isInstallment && e.installmentNum > 1)) : items;
+    const recurring = isFirstOfMonth ? items.filter(e => e.isRecurring && !e.isPendingValue) : [];
+    const regular = items.filter(e =>
+      !(isFirstOfMonth && e.isInstallment && e.installmentNum > 1) &&
+      !(isFirstOfMonth && e.isRecurring && !e.isPendingValue)
+    );
 
-    let html = `<div class="section-date">${label}</div>`;
-
-    // Render regular expenses normally
+    let html = '<div class="section-date">' + label + '</div>';
     html += regular.map(e => renderExpenseItem(e)).join('');
 
-    // Render installments grouped under one header
+    if (recurring.length > 0) {
+      const totalRecur = recurring.reduce((s,e) => s+e.amount, 0);
+      html += '<div class="expense-item" onclick="toggleRecurGroup(\'' + date + '\')" style="cursor:pointer;background:var(--surface-raised);border-left:3px solid var(--green-400)">' +
+        '<div class="expense-cat-icon">&#128257;</div>' +
+        '<div class="expense-info">' +
+          '<div class="expense-desc" style="font-weight:700">Gastos Fixos</div>' +
+          '<div class="expense-meta"><span style="color:var(--text-hint)">' + recurring.length + ' lancamento(s)</span></div>' +
+        '</div>' +
+        '<div class="expense-right">' +
+          '<div class="expense-amount">-' + fmtCurrency(totalRecur) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-hint)" id="recur-toggle-' + date + '">&#9660; ver</div>' +
+        '</div></div>' +
+        '<div id="recur-group-' + date + '" style="display:none">' +
+        recurring.map(e => renderExpenseItem(e)).join('') + '</div>';
+    }
+
     if (installments.length > 0) {
       const totalInst = installments.reduce((s,e) => s+e.amount, 0);
-      html += `
-        <div class="expense-item installment-group-header" onclick="toggleInstallmentGroup('${date}')" style="cursor:pointer;background:var(--surface-raised);border-left:3px solid var(--blue-400)">
-          <div class="expense-cat-icon">💳</div>
-          <div class="expense-info">
-            <div class="expense-desc" style="font-weight:700">Compras parceladas</div>
-            <div class="expense-meta">
-              <span style="color:var(--text-hint)">${installments.length} parcela(s)</span>
-            </div>
-          </div>
-          <div class="expense-right">
-            <div class="expense-amount">-${fmtCurrency(totalInst)}</div>
-            <div style="font-size:11px;color:var(--text-hint);text-align:right" id="inst-toggle-${date}">▼ ver</div>
-          </div>
-        </div>
-        <div id="inst-group-${date}" style="display:none">
-          ${installments.map(e => renderExpenseItem(e)).join('')}
-        </div>`;
+      html += '<div class="expense-item installment-group-header" onclick="toggleInstallmentGroup(\'' + date + '\')" style="cursor:pointer;background:var(--surface-raised);border-left:3px solid var(--blue-400)">' +
+        '<div class="expense-cat-icon">&#128179;</div>' +
+        '<div class="expense-info">' +
+          '<div class="expense-desc" style="font-weight:700">Compras parceladas</div>' +
+          '<div class="expense-meta"><span style="color:var(--text-hint)">' + installments.length + ' parcela(s)</span></div>' +
+        '</div>' +
+        '<div class="expense-right">' +
+          '<div class="expense-amount">-' + fmtCurrency(totalInst) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-hint)" id="inst-toggle-' + date + '">&#9660; ver</div>' +
+        '</div></div>' +
+        '<div id="inst-group-' + date + '" style="display:none">' +
+        installments.map(e => renderExpenseItem(e)).join('') + '</div>';
     }
 
     return html;
   }).join('');
+  list.innerHTML = pendingHtml + groupedHtml;
 }
 
 function toggleInstallmentGroup(date) {
-  const group = document.getElementById('inst-group-' + date);
-  const toggle = document.getElementById('inst-toggle-' + date);
+  var group = document.getElementById('inst-group-' + date);
+  var toggle = document.getElementById('inst-toggle-' + date);
   if (!group) return;
-  const isOpen = group.style.display !== 'none';
+  var isOpen = group.style.display !== 'none';
   group.style.display = isOpen ? 'none' : 'block';
-  if (toggle) toggle.textContent = isOpen ? '▼ ver' : '▲ ocultar';
+  if (toggle) toggle.textContent = isOpen ? 'ver' : 'ocultar';
+}
+function toggleRecurGroup(date) {
+  var group = document.getElementById('recur-group-' + date);
+  var toggle = document.getElementById('recur-toggle-' + date);
+  if (!group) return;
+  var isOpen = group.style.display !== 'none';
+  group.style.display = isOpen ? 'none' : 'block';
+  if (toggle) toggle.textContent = isOpen ? 'ver' : 'ocultar';
+}
+function togglePendingGroup() {
+  var group = document.getElementById('pending-group');
+  var toggle = document.getElementById('pending-toggle-label');
+  if (!group) return;
+  var isOpen = group.style.display !== 'none';
+  group.style.display = isOpen ? 'none' : 'block';
+  if (toggle) toggle.textContent = isOpen ? 'ver' : 'ocultar';
 }
 
 // ── Update header ──
@@ -3199,23 +3304,27 @@ function submitRecur() {
     // Não duplicar se já existe
     if (expenses.some(e => e.id === expId)) continue;
 
+    const isCurrentMonth = m === 0;
+    const isPending = recurVarActive && !isCurrentMonth;
+
     const newExp = {
       id: expId,
       recurringId: recurId,
       person: selectedRecurPerson,
       description: desc,
-      amount,
+      amount: isPending ? 0 : amount,
       category: selectedRecurCategory,
       categoryLabel: cat.label,
       categoryIcon: cat.icon,
       date: expDate,
       isRecurring: true,
+      isPendingValue: isPending,
       createdAt: new Date().toISOString(),
       synced: false
     };
 
     expenses.push(newExp);
-    syncExpense(newExp, 'addExpense');
+    if (!isPending) syncExpense(newExp, 'addExpense');
   }
 
   expenses.sort((a,b) => (b.date||'').localeCompare(a.date||''));
@@ -4428,6 +4537,132 @@ function migrateInstallments() {
   }
 }
 
+// ════ PENDING RECURRING VALUE ════
+var pendingValueExpId = null;
+
+function openPendingValueModal(expId) {
+  var e = expenses.find(function(x) { return x.id === expId; });
+  if (!e) return;
+  pendingValueExpId = expId;
+  var title = document.getElementById('pendingValueTitle');
+  var desc = document.getElementById('pendingValueDesc');
+  var input = document.getElementById('pendingValueInput');
+  if (title) title.textContent = e.description;
+  if (desc) desc.textContent = e.categoryIcon + ' ' + e.categoryLabel + ' · ' + e.person;
+  if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 300); }
+  document.getElementById('pendingValueModal').classList.add('open');
+}
+
+function closePendingValueModal() {
+  document.getElementById('pendingValueModal').classList.remove('open');
+  pendingValueExpId = null;
+}
+
+function confirmPendingValue() {
+  if (!pendingValueExpId) return;
+  var raw = document.getElementById('pendingValueInput').value.replace(/\./g,'').replace(',','.');
+  var amount = parseFloat(raw);
+  if (!amount || amount <= 0) { showToast('⚠️ Informe um valor válido'); return; }
+  var e = expenses.find(function(x) { return x.id === pendingValueExpId; });
+  if (!e) return;
+  e.amount = amount;
+  e.isPendingValue = false;
+  e.synced = false;
+  saveToStorage();
+  syncExpense(e);
+  closePendingValueModal();
+  updateHeader();
+  renderExpenses();
+  showToast('✅ ' + e.description + ' — ' + fmtCurrency(amount) + ' lançado!');
+  vibrate(40);
+}
+
+// MAKE RECURRING FROM EXISTING EXPENSE
+var makeRecurExpId = null;
+var mkDuration = 0;
+var mkVarActive = true;
+
+function openMakeRecurModal(expId) {
+  var e = expenses.find(function(x) { return x.id === expId; });
+  if (!e) return;
+  makeRecurExpId = expId;
+  mkDuration = 0;
+  mkVarActive = true;
+  var desc = document.getElementById('makeRecurDesc');
+  if (desc) desc.textContent = (e.categoryIcon||'') + ' ' + e.description + ' - ' + fmtCurrency(e.amount);
+  [0,3,6,12].forEach(function(d) {
+    var btn = document.getElementById('mkdur-' + d);
+    if (btn) btn.className = 'duration-chip' + (d === 0 ? ' selected' : '');
+  });
+  var toggle = document.getElementById('mkVarToggle');
+  if (toggle) toggle.classList.add('active');
+  document.getElementById('makeRecurModal').classList.add('open');
+}
+function closeMakeRecurModal() {
+  document.getElementById('makeRecurModal').classList.remove('open');
+  makeRecurExpId = null;
+}
+function selectMkDuration(d) {
+  mkDuration = d;
+  [0,3,6,12].forEach(function(v) {
+    var btn = document.getElementById('mkdur-' + v);
+    if (btn) btn.className = 'duration-chip' + (v === d ? ' selected' : '');
+  });
+}
+function toggleMkVar() {
+  mkVarActive = !mkVarActive;
+  var toggle = document.getElementById('mkVarToggle');
+  if (toggle) toggle.classList.toggle('active', mkVarActive);
+}
+function confirmMakeRecur() {
+  if (!makeRecurExpId) return;
+  var e = expenses.find(function(x) { return x.id === makeRecurExpId; });
+  if (!e) return;
+  var recurId = 'recur_' + Date.now().toString(36);
+  var expDate = e.date || '';
+  var parts = expDate.split('-').map(Number);
+  var day = parts[2] || 1;
+  var allCats = getAllCategories();
+  var cat = allCats.find(function(c) { return c.id === e.category; }) || { label: e.categoryLabel, icon: e.categoryIcon };
+  var now = new Date();
+  var monthsToLaunch = mkDuration > 0 ? mkDuration : 24;
+  for (var m = 1; m < monthsToLaunch; m++) {
+    var targetDate = new Date(now.getFullYear(), now.getMonth() + m, 1);
+    var targetMonth = targetDate.getFullYear() + '-' + String(targetDate.getMonth()+1).padStart(2,'0');
+    var daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth()+1, 0).getDate();
+    var actualDay = Math.min(day, daysInMonth);
+    var expDateFuture = targetMonth + '-' + String(actualDay).padStart(2,'0');
+    var expId = 'recur_' + recurId + '_' + targetMonth;
+    if (expenses.some(function(x) { return x.id === expId; })) continue;
+    var newExp = {
+      id: expId, recurringId: recurId, person: e.person,
+      description: e.description, amount: mkVarActive ? 0 : e.amount,
+      category: e.category, categoryLabel: cat.label, categoryIcon: cat.icon,
+      date: expDateFuture, isRecurring: true, isPendingValue: mkVarActive,
+      createdAt: new Date().toISOString(), synced: false
+    };
+    expenses.push(newExp);
+    if (!mkVarActive) syncExpense(newExp);
+  }
+  recurringExpenses.push({
+    id: recurId, person: e.person, description: e.description,
+    amount: e.amount, category: e.category, day: day,
+    startMonth: expDate.slice(0,7), totalMonths: mkDuration,
+    varValue: mkVarActive, launchedCount: 1
+  });
+  e.isRecurring = true;
+  e.recurringId = recurId;
+  expenses.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+  saveToStorage();
+  saveRecurring();
+  closeMakeRecurModal();
+  updateHeader();
+  renderExpenses();
+  renderRecurList();
+  showToast('Gasto fixo criado!');
+  vibrate(40);
+}
+
 // ── Toast ──
 let toastTimer;
 function showToast(msg) {
@@ -4492,6 +4727,10 @@ window.addEventListener('popstate', function(e) {
   const delCatModal = document.getElementById('delCatModal');
 
   // Fechar qualquer modal aberto
+  const pendingValueModal = document.getElementById('pendingValueModal');
+  if (pendingValueModal && pendingValueModal.classList.contains('open')) { closePendingValueModal(); return; }
+  const makeRecurModal = document.getElementById('makeRecurModal');
+  if (makeRecurModal && makeRecurModal.classList.contains('open')) { closeMakeRecurModal(); return; }
   const filterModal = document.getElementById('filterModal');
   if (filterModal && filterModal.classList.contains('open')) { closeFilterModal(); return; }
   const trashModal = document.getElementById('trashModal');
