@@ -986,6 +986,7 @@
       <div class="config-section">
         <div class="config-section-title">Dados locais</div>
         <button class="btn-secondary" onclick="exportAllData()" style="margin-bottom:8px">⬇️ Exportar todos os dados (CSV)</button>
+        <button class="btn-secondary" onclick="migrateInstallments()" style="margin-bottom:8px">💳 Reorganizar parcelas existentes</button>
         <button class="btn-secondary" onclick="openTrashModal()" style="margin-bottom:8px">🗑️ Lixeira <span id="trashCount" style="background:var(--red-500);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px">0</span></button>
         <button class="btn-danger" onclick="clearData()">🗑️ Limpar dados locais</button>
       </div>
@@ -1988,13 +1989,22 @@ async function submitExpense() {
         const baseId = Date.now().toString(36);
         const baseDate = new Date(date + 'T12:00:00');
         for (let i = 0; i < count; i++) {
-          const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, baseDate.getDate());
-          const iDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          let iDate;
+          if (i === 0) {
+            // Primeira parcela: mantém a data original do lançamento
+            iDate = date;
+          } else {
+            // Demais parcelas: sempre dia 01 do mês seguinte
+            const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1);
+            iDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+          }
           const installment = {
             id: baseId + '_p' + (i+1),
             person: selectedPerson, amount: perMonth,
             category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
-            description: `${desc||cat.label} (${i+1}/${count})`,
+            description: i === 0
+              ? `${desc||cat.label} (${i+1}/${count})`
+              : `Compras parceladas — ${desc||cat.label} (${i+1}/${count})`,
             date: iDate, createdAt: new Date().toISOString(), synced: false,
             isInstallment: true, installmentNum: i+1, installmentTotal: count
           };
@@ -4311,6 +4321,68 @@ function checkPartnerNewExpenses(remoteExpenses) {
     }
   });
   lastKnownExpenseIds = new Set(Object.keys(remoteExpenses || {}));
+}
+
+// ════ MIGRAR PARCELAS EXISTENTES ════
+function migrateInstallments() {
+  var updated = 0;
+  // Group installments by baseId
+  var groups = {};
+  expenses.forEach(function(e) {
+    if (!e.isInstallment) return;
+    var baseId = e.id.replace(/_p[0-9]+$/, '');
+    if (!groups[baseId]) groups[baseId] = [];
+    groups[baseId].push(e);
+  });
+
+  Object.keys(groups).forEach(function(baseId) {
+    var group = groups[baseId].sort(function(a,b) { return a.installmentNum - b.installmentNum; });
+    if (group.length < 2) return;
+
+    // First installment keeps original date
+    var firstDate = group[0].date;
+    var firstParts = firstDate.split('-').map(Number);
+    var baseYear = firstParts[0];
+    var baseMonth = firstParts[1];
+
+    group.forEach(function(e, i) {
+      if (i === 0) {
+        // First: keep original date, just update description if needed
+        var newDesc = e.description.replace(/^Compras parceladas — /, '');
+        if (e.description !== newDesc) {
+          e.description = newDesc;
+          updated++;
+        }
+        return;
+      }
+      // Others: set to day 01 of correct month
+      var targetDate = new Date(baseYear, baseMonth - 1 + i, 1);
+      var newDate = targetDate.getFullYear() + '-' +
+        String(targetDate.getMonth()+1).padStart(2,'0') + '-01';
+
+      // Update description to include "Compras parceladas" prefix
+      var cleanDesc = e.description.replace(/^Compras parceladas — /, '');
+      var newDesc = 'Compras parceladas — ' + cleanDesc;
+
+      if (e.date !== newDate || e.description !== newDesc) {
+        e.date = newDate;
+        e.description = newDesc;
+        syncExpense(e);
+        updated++;
+      }
+    });
+  });
+
+  if (updated > 0) {
+    expenses.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+    saveToStorage();
+    updateHeader();
+    renderExpenses();
+    renderStats();
+    showToast('✅ ' + updated + ' parcela(s) reorganizada(s)!');
+  } else {
+    showToast('✅ Nenhuma parcela precisou ser atualizada');
+  }
 }
 
 // ── Toast ──
