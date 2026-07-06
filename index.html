@@ -2002,9 +2002,7 @@ async function submitExpense() {
             id: baseId + '_p' + (i+1),
             person: selectedPerson, amount: perMonth,
             category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
-            description: i === 0
-              ? `${desc||cat.label} (${i+1}/${count})`
-              : `Compras parceladas — ${desc||cat.label} (${i+1}/${count})`,
+            description: `${desc||cat.label} (${i+1}/${count})`,
             date: iDate, createdAt: new Date().toISOString(), synced: false,
             isInstallment: true, installmentNum: i+1, installmentTotal: count
           };
@@ -2072,10 +2070,8 @@ function renderExpenses() {
   const today = new Date().toISOString().split('T')[0];
   const yesterday = new Date(Date.now()-86400000).toISOString().split('T')[0];
 
-  list.innerHTML = Object.entries(grouped).sort(([a],[b]) => b.localeCompare(a)).map(([date, items]) => {
-    const d = new Date(date + 'T12:00:00');
-    let label = date === today ? 'Hoje' : date === yesterday ? 'Ontem' : d.toLocaleDateString('pt-BR', {weekday:'short', day:'numeric', month:'short'});
-    return `<div class="section-date">${label}</div>` + items.map(e => `
+  function renderExpenseItem(e) {
+    return `
       <div class="expense-item">
         <div class="expense-cat-icon">${e.categoryIcon}</div>
         <div class="expense-info">
@@ -2093,8 +2089,56 @@ function renderExpenses() {
             <button class="expense-action-btn del" onclick="openDelModal('${e.id}')" title="Excluir">🗑️</button>
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+  }
+
+  list.innerHTML = Object.entries(grouped).sort(([a],[b]) => b.localeCompare(a)).map(([date, items]) => {
+    const d = new Date(date + 'T12:00:00');
+    let label = date === today ? 'Hoje' : date === yesterday ? 'Ontem' : d.toLocaleDateString('pt-BR', {weekday:'short', day:'numeric', month:'short'});
+
+    // Separate installments on day 01 from regular expenses
+    const isFirstOfMonth = date.endsWith('-01');
+    const installments = isFirstOfMonth ? items.filter(e => e.isInstallment && e.installmentNum > 1) : [];
+    const regular = isFirstOfMonth ? items.filter(e => !(e.isInstallment && e.installmentNum > 1)) : items;
+
+    let html = `<div class="section-date">${label}</div>`;
+
+    // Render regular expenses normally
+    html += regular.map(e => renderExpenseItem(e)).join('');
+
+    // Render installments grouped under one header
+    if (installments.length > 0) {
+      const totalInst = installments.reduce((s,e) => s+e.amount, 0);
+      html += `
+        <div class="expense-item installment-group-header" onclick="toggleInstallmentGroup('${date}')" style="cursor:pointer;background:var(--surface-raised);border-left:3px solid var(--blue-400)">
+          <div class="expense-cat-icon">💳</div>
+          <div class="expense-info">
+            <div class="expense-desc" style="font-weight:700">Compras parceladas</div>
+            <div class="expense-meta">
+              <span style="color:var(--text-hint)">${installments.length} parcela(s)</span>
+            </div>
+          </div>
+          <div class="expense-right">
+            <div class="expense-amount">-${fmtCurrency(totalInst)}</div>
+            <div style="font-size:11px;color:var(--text-hint);text-align:right" id="inst-toggle-${date}">▼ ver</div>
+          </div>
+        </div>
+        <div id="inst-group-${date}" style="display:none">
+          ${installments.map(e => renderExpenseItem(e)).join('')}
+        </div>`;
+    }
+
+    return html;
   }).join('');
+}
+
+function toggleInstallmentGroup(date) {
+  const group = document.getElementById('inst-group-' + date);
+  const toggle = document.getElementById('inst-toggle-' + date);
+  if (!group) return;
+  const isOpen = group.style.display !== 'none';
+  group.style.display = isOpen ? 'none' : 'block';
+  if (toggle) toggle.textContent = isOpen ? '▼ ver' : '▲ ocultar';
 }
 
 // ── Update header ──
@@ -4360,9 +4404,8 @@ function migrateInstallments() {
       var newDate = targetDate.getFullYear() + '-' +
         String(targetDate.getMonth()+1).padStart(2,'0') + '-01';
 
-      // Update description to include "Compras parceladas" prefix
-      var cleanDesc = e.description.replace(/^Compras parceladas — /, '');
-      var newDesc = 'Compras parceladas — ' + cleanDesc;
+      // Clean up any "Compras parceladas" prefix already in description
+      var newDesc = e.description.replace(/^Compras parceladas — /, '');
 
       if (e.date !== newDate || e.description !== newDesc) {
         e.date = newDate;
