@@ -4522,7 +4522,7 @@ function migrateInstallments() {
       if (e.date !== newDate || e.description !== newDesc) {
         e.date = newDate;
         e.description = newDesc;
-        syncExpense(e);
+        e.synced = false;
         updated++;
       }
     });
@@ -4531,10 +4531,14 @@ function migrateInstallments() {
   if (updated > 0) {
     expenses.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
     saveToStorage();
+    // Sync all updated expenses to Firebase in batch
+    expenses.forEach(function(e) {
+      if (e.synced === false) syncExpense(e);
+    });
     updateHeader();
     renderExpenses();
     renderStats();
-    showToast('✅ ' + updated + ' parcela(s) reorganizada(s)!');
+    showToast('✅ ' + updated + ' parcela(s) reorganizada(s) e sincronizada(s)!');
   } else {
     showToast('✅ Nenhuma parcela precisou ser atualizada');
   }
@@ -4645,24 +4649,30 @@ function confirmMakeRecur() {
       createdAt: new Date().toISOString(), synced: false
     };
     expenses.push(newExp);
-    if (!mkVarActive) syncExpense(newExp);
+    // Sync ALL to Firebase — pending ones with amount:0 so the other device knows they exist
+    syncExpense(newExp);
   }
-  recurringExpenses.push({
+  var newRecur = {
     id: recurId, person: e.person, description: e.description,
-    amount: e.amount, category: e.category, day: day,
-    startMonth: expDate.slice(0,7), totalMonths: mkDuration,
+    amount: e.amount, category: e.category, categoryLabel: cat.label, categoryIcon: cat.icon,
+    day: day, startMonth: expDate.slice(0,7), totalMonths: mkDuration,
     varValue: mkVarActive, launchedCount: 1
-  });
+  };
+  recurringExpenses.push(newRecur);
+  // Sync the original expense as updated (now has isRecurring flag)
   e.isRecurring = true;
   e.recurringId = recurId;
+  syncExpense(e);
   expenses.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
   saveToStorage();
   saveRecurring();
+  // syncRecurring saves recurringExpenses to Firebase
+  syncRecurring();
   closeMakeRecurModal();
   updateHeader();
   renderExpenses();
   renderRecurList();
-  showToast('Gasto fixo criado!');
+  showToast('Gasto fixo criado e sincronizado!');
   vibrate(40);
 }
 
