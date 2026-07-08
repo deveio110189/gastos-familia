@@ -796,12 +796,6 @@
         <div style="font-size:11px;color:var(--text-hint)" id="goalInfo"></div>
       </div>
 
-      <!-- View toggle -->
-      <div class="tl-toggle-wrap">
-        <button class="tl-toggle-btn active" id="viewList" onclick="setExpenseView('list')">&#9776; Lista</button>
-        <button class="tl-toggle-btn" id="viewTimeline" onclick="setExpenseView('timeline')">&#9632;&#9472; Linha do tempo</button>
-      </div>
-
       <!-- Search + Filter -->
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
         <div class="search-wrap" style="flex:1;margin-bottom:0">
@@ -1316,6 +1310,16 @@
       </div>
       <div class="filter-section-title">Categoria</div>
       <div class="filter-options" id="catFilterOptions"></div>
+      <div class="filter-section-title">Visualização</div>
+      <div class="filter-options">
+        <button class="filter-option" id="fsort-view-list" onclick="setExpenseView('list')" style="display:flex;align-items:center;gap:6px">
+          <span>&#9776;</span> Lista
+        </button>
+        <button class="filter-option" id="fsort-view-timeline" onclick="setExpenseView('timeline')" style="display:flex;align-items:center;gap:6px">
+          <span>&#9632;&#9472;</span> Linha do tempo
+        </button>
+      </div>
+
       <div style="margin-top:20px;display:flex;gap:8px">
         <button class="btn-secondary" style="flex:1;margin-bottom:0" onclick="clearFilters()">Limpar filtros</button>
         <button class="btn-primary" style="flex:1" onclick="closeFilterModal()">Aplicar</button>
@@ -4265,6 +4269,11 @@ function updateUserUI() {
 
 // ════ FILTER MODAL ════
 function openFilterModal() {
+  // Reflect current view in modal
+  var listBtn = document.getElementById('fsort-view-list');
+  var tlBtn = document.getElementById('fsort-view-timeline');
+  if (listBtn) listBtn.className = 'filter-option' + (currentExpenseView==='list' ? ' sel' : '');
+  if (tlBtn) tlBtn.className = 'filter-option' + (currentExpenseView==='timeline' ? ' sel' : '');
   var prefix = getViewMonthPrefix();
   var monthExp = expenses.filter(function(e) { return e.date.startsWith(prefix); });
   var cats = {};
@@ -5262,10 +5271,14 @@ var currentExpenseView = 'list';
 
 function setExpenseView(view) {
   currentExpenseView = view;
-  var listBtn = document.getElementById('viewList');
-  var tlBtn = document.getElementById('viewTimeline');
-  if (listBtn) listBtn.className = 'tl-toggle-btn' + (view==='list'?' active':'');
-  if (tlBtn) tlBtn.className = 'tl-toggle-btn' + (view==='timeline'?' active':'');
+  localStorage.setItem('fin_expense_view', view);
+  // Update filter modal buttons
+  var listBtn = document.getElementById('fsort-view-list');
+  var tlBtn = document.getElementById('fsort-view-timeline');
+  if (listBtn) listBtn.className = 'filter-option' + (view==='list' ? ' sel' : '');
+  if (tlBtn) tlBtn.className = 'filter-option' + (view==='timeline' ? ' sel' : '');
+  // Update filter button badge
+  updateFilterBtn();
   renderExpenses();
 }
 
