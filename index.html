@@ -1514,6 +1514,9 @@ function loadCategories() {
 function saveCategories() {
   localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
   localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
+  // Store current timestamp so Firebase listener knows this is newer
+  var ts = new Date().toISOString();
+  localStorage.setItem('fin_config_updated', ts);
   syncConfig();
 }
 function getAllCategories() { return [...CATEGORIES, ...customCategories]; }
@@ -1623,9 +1626,10 @@ window.onFirebaseExpenses = function(remoteExpenses) {
 // Bridge: called by Firebase module when config updates
 window.onFirebaseConfig = function(data) {
   const localUpdated = localStorage.getItem('fin_config_updated') || '';
-  if (data.updatedAt && data.updatedAt <= localUpdated) return;
+  // If local config is newer, skip Firebase update for categories
+  const localIsNewer = data.updatedAt && data.updatedAt <= localUpdated;
   let changed = false;
-  if (data.customCategories && Array.isArray(data.customCategories)) {
+  if (data.customCategories && Array.isArray(data.customCategories) && !localIsNewer) {
     const localIds = new Set(customCategories.map(c => c.id));
     data.customCategories.forEach(rc => {
       if (!localIds.has(rc.id)) { customCategories.push(rc); changed = true; }
