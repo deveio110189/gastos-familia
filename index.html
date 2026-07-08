@@ -2968,15 +2968,25 @@ function closeDelCatModal() { document.getElementById('delCatModal').classList.r
 function confirmDeleteCat() {
   if (!deletingCatId) return;
   if (deletingCatIsDefault) {
-    // Add to a "hidden defaults" list
     var hidden = JSON.parse(localStorage.getItem('fin_hidden_cats') || '[]');
     if (!hidden.includes(deletingCatId)) hidden.push(deletingCatId);
     localStorage.setItem('fin_hidden_cats', JSON.stringify(hidden));
   }
+  // Remove from customCategories
   customCategories = customCategories.filter(function(c) { return c.id !== deletingCatId; });
+  // Remove budget
   delete categoryBudgets[deletingCatId];
-  saveCategories(); closeDelCatModal(); renderCategoryGrid(); renderCatScreen(); vibrate([50,30,50]);
-  showToast('🗑️ Categoria excluída');
+  // Save and refresh ALL relevant UI
+  saveCategories();
+  closeDelCatModal();
+  renderCategoryGrid();  // modal de novo gasto
+  renderCatScreen();     // tela de categorias
+  updateHeader();        // recalcular orçamento
+  renderExpenses();      // refresh lista
+  vibrate([50,30,50]);
+  showToast('Categoria excluida!');
+  deletingCatId = null;
+  deletingCatIsDefault = false;
 }
 
 // ── Report ──
