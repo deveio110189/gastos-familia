@@ -630,6 +630,34 @@
     .pie-legend-item { display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:20px;cursor:pointer;transition:all 0.15s;border:1.5px solid transparent; }
     .pie-legend-item.active { border-color:var(--border-strong);background:var(--surface-raised); }
     .pie-legend-dot { width:12px;height:12px;border-radius:50%;flex-shrink:0; }
+
+    .cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px; }
+    .cal-day-head { text-align:center;font-size:10px;font-weight:700;color:var(--text-hint);padding:4px 0; }
+    .cal-day { aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;border:1.5px solid transparent; }
+    .cal-day.empty { cursor:default;pointer-events:none; }
+    .cal-day.has-exp { background:var(--surface-raised); }
+    .cal-day.today { border-color:var(--green-500); }
+    .cal-day.selected { background:var(--green-50);border-color:var(--green-500); }
+    .cal-day-num { font-size:11px;font-weight:600;color:var(--text); }
+    .cal-dot { width:5px;height:5px;border-radius:50%;margin-top:2px; }
+    .cal-day-amt { font-size:9px;font-weight:600;margin-top:1px; }
+    .cal-detail { padding:10px;background:var(--surface-raised);border-radius:10px;margin-top:8px;min-height:56px; }
+    .cal-detail-row { display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border); }
+    .cal-detail-row:last-child { border-bottom:none; }
+    .tl-toggle-wrap { display:flex;gap:6px;margin-bottom:10px; }
+    .tl-toggle-btn { flex:1;padding:7px;border-radius:10px;border:1.5px solid var(--border-strong);background:var(--surface);font-family:var(--font);font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;text-align:center; }
+    .tl-toggle-btn.active { background:var(--green-500);border-color:var(--green-500);color:#fff; }
+    .tl-item { display:flex;gap:10px;margin-bottom:4px;padding:8px 10px;border-radius:10px;background:var(--surface);cursor:pointer;transition:all .15s; }
+    .tl-spine { display:flex;flex-direction:column;align-items:center;flex-shrink:0; }
+    .tl-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px; }
+    .tl-line { width:1.5px;flex:1;background:var(--border);margin-top:3px;min-height:16px; }
+    .tl-content { flex:1;min-width:0; }
+    .tl-time { font-size:10px;color:var(--text-hint); }
+    .tl-desc { font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .tl-meta { font-size:11px;color:var(--text-muted);margin-top:2px; }
+    .tl-amt { font-size:13px;font-weight:700;color:var(--red-700);font-family:var(--mono);flex-shrink:0;padding-top:3px; }
+    .tl-day-sep { font-size:10px;font-weight:700;color:var(--text-hint);letter-spacing:.05em;padding:8px 0 4px;display:flex;align-items:center;gap:8px; }
+    .tl-day-sep::after { content:'';flex:1;height:.5px;background:var(--border); }
     input[type="month"], input[type="date"] { color-scheme: light dark; }
 
     /* Splash */
@@ -732,12 +760,15 @@
     <!-- Home -->
     <div class="screen active" id="screen-home">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:6px">
         <button onclick="openMonthPicker()" style="display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1.5px solid var(--border-strong);border-radius:20px;padding:6px 14px;cursor:pointer;font-family:var(--font)">
           <span style="font-size:14px">📅</span>
           <span id="monthPickerLabel" style="font-size:13px;font-weight:700;color:var(--text)">Jun 2026</span>
           <span style="font-size:10px;color:var(--text-hint)">▼</span>
         </button>
-        <button class="current-user-badge w" id="currentUserBadge" onclick="showUserSelect()" title="Trocar usuário">
+          <button onclick="openCalendarModal()" title="Ver calendario" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:16px;flex-shrink:0">&#128197;</button>
+        </div>
+        <button class="current-user-badge w" id="currentUserBadge" onclick="showUserSelect()" title="Trocar usuario">
           <span id="currentUserIcon">W</span>
           <span id="currentUserName">Welinton</span>
         </button>
@@ -763,6 +794,12 @@
           <div class="goal-bar-fill" id="goalBarFill" style="width:0%"></div>
         </div>
         <div style="font-size:11px;color:var(--text-hint)" id="goalInfo"></div>
+      </div>
+
+      <!-- View toggle -->
+      <div class="tl-toggle-wrap">
+        <button class="tl-toggle-btn active" id="viewList" onclick="setExpenseView('list')">&#9776; Lista</button>
+        <button class="tl-toggle-btn" id="viewTimeline" onclick="setExpenseView('timeline')">&#9632;&#9472; Linha do tempo</button>
       </div>
 
       <!-- Search + Filter -->
@@ -1384,6 +1421,22 @@
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn-secondary" style="flex:1;margin-bottom:0" onclick="closeMakeRecurModal()">Cancelar</button>
         <button class="btn-primary" style="flex:1" onclick="confirmMakeRecur()">&#9989; Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calendar Modal -->
+  <div class="modal-overlay" id="calendarModal" onclick="if(event.target===this)closeCalendarModal()">
+    <div class="modal-sheet" style="max-height:80dvh">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="modal-title" style="margin-bottom:0" id="calModalTitle">Jul 2026</div>
+        <div style="font-size:13px;font-weight:700;color:var(--red-700);font-family:var(--mono)" id="calModalTotal"></div>
+      </div>
+      <div class="cal-grid" id="calDayHeads"></div>
+      <div class="cal-grid" id="calDaysGrid"></div>
+      <div class="cal-detail" id="calDetail">
+        <div style="font-size:12px;color:var(--text-hint);text-align:center;padding:8px 0">Toque em um dia para ver os gastos</div>
       </div>
     </div>
   </div>
@@ -2193,8 +2246,13 @@ function renderExpenses() {
   else if (currentSort === 'person') filtered.sort((a,b) => (a.person||'').localeCompare(b.person||''));
   else filtered.sort((a,b) => (b.date||'').localeCompare(a.date||''));
 
+  if (currentExpenseView === 'timeline') {
+    renderTimeline(filtered);
+    return;
+  }
+
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-title">Nenhum gasto ainda</div><div class="empty-desc">Toque no + para adicionar seu primeiro lançamento</div></div>`;
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">&#127807;</div><div class="empty-title">Nenhum gasto ainda</div><div class="empty-desc">Toque no + para adicionar seu primeiro lancamento</div></div>';
     return;
   }
 
@@ -5088,6 +5146,203 @@ function restoreHiddenCats() {
   showToast('Categorias restauradas!');
 }
 
+// ════ CALENDAR MODAL ════
+var calSelectedDay = null;
+
+function openCalendarModal() {
+  calSelectedDay = null;
+  renderCalendar();
+  document.getElementById('calendarModal').classList.add('open');
+}
+
+function closeCalendarModal() {
+  document.getElementById('calendarModal').classList.remove('open');
+}
+
+function renderCalendar() {
+  var vm = getViewMonth();
+  var year = vm.year;
+  var month = vm.month;
+  var months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var fullMonths = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var prefix = year + '-' + String(month).padStart(2,'0');
+
+  var titleEl = document.getElementById('calModalTitle');
+  if (titleEl) titleEl.textContent = fullMonths[month-1] + ' ' + year;
+
+  // Group expenses by day
+  var byDay = {};
+  expenses.forEach(function(e) {
+    if (!e.date.startsWith(prefix) || e.isPendingValue) return;
+    var day = parseInt(e.date.split('-')[2]);
+    if (!byDay[day]) byDay[day] = [];
+    byDay[day].push(e);
+  });
+
+  var monthTotal = Object.values(byDay).reduce(function(s,arr) {
+    return s + arr.reduce(function(s2,e) { return s2+e.amount; }, 0);
+  }, 0);
+
+  var totalEl = document.getElementById('calModalTotal');
+  if (totalEl) totalEl.textContent = '-' + fmtCurrency(monthTotal);
+
+  // Day headers
+  var heads = document.getElementById('calDayHeads');
+  if (heads) {
+    heads.innerHTML = ['D','S','T','Q','Q','S','S'].map(function(d) {
+      return '<div class="cal-day-head">' + d + '</div>';
+    }).join('');
+  }
+
+  // First day of month (0=Sun)
+  var firstDay = new Date(year, month-1, 1).getDay();
+  var daysInMonth = new Date(year, month, 0).getDate();
+  var now = new Date();
+  var todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+
+  var grid = document.getElementById('calDaysGrid');
+  if (!grid) return;
+  var html = '';
+
+  for (var i=0; i<firstDay; i++) {
+    html += '<div class="cal-day empty"><span class="cal-day-num">.</span></div>';
+  }
+
+  for (var d=1; d<=daysInMonth; d++) {
+    var dayStr = prefix + '-' + String(d).padStart(2,'0');
+    var dayExps = byDay[d] || [];
+    var dayTotal = dayExps.reduce(function(s,e) { return s+e.amount; }, 0);
+    var hasExp = dayExps.length > 0;
+    var isToday = dayStr === todayStr;
+    var isSel = calSelectedDay === d;
+
+    var intensity = dayTotal > 500 ? '#085041' : dayTotal > 200 ? '#0F6E56' : dayTotal > 100 ? '#1D9E75' : '#5DCAA5';
+
+    html += '<div class="cal-day' + (hasExp?' has-exp':'') + (isToday?' today':'') + (isSel?' selected':'') +
+      '" onclick="selectCalDay(' + d + ')">' +
+      '<span class="cal-day-num">' + d + '</span>' +
+      (hasExp ? '<div class="cal-dot" style="background:' + intensity + '"></div>' : '') +
+      (hasExp ? '<span class="cal-day-amt" style="color:' + intensity + '">' +
+        (dayTotal >= 1000 ? (dayTotal/1000).toFixed(1)+'k' : Math.round(dayTotal)) +
+      '</span>' : '') +
+      '</div>';
+  }
+  grid.innerHTML = html;
+  if (calSelectedDay) selectCalDay(calSelectedDay);
+}
+
+function selectCalDay(d) {
+  calSelectedDay = d;
+  renderCalendar();
+  var vm = getViewMonth();
+  var prefix = vm.year + '-' + String(vm.month).padStart(2,'0');
+  var dayStr = prefix + '-' + String(d).padStart(2,'0');
+  var dayExps = expenses.filter(function(e) { return e.date === dayStr && !e.isPendingValue; });
+  var detail = document.getElementById('calDetail');
+  if (!detail) return;
+  if (!dayExps.length) {
+    detail.innerHTML = '<div style="font-size:12px;color:var(--text-hint);text-align:center;padding:8px 0">Nenhum gasto neste dia</div>';
+    return;
+  }
+  var html = dayExps.map(function(e) {
+    return '<div class="cal-detail-row">' +
+      '<div style="display:flex;align-items:center;gap:6px">' +
+        '<span style="font-size:14px">' + e.categoryIcon + '</span>' +
+        '<div><div style="font-size:12px;font-weight:600;color:var(--text)">' + e.description + '</div>' +
+        '<div style="font-size:10px;color:var(--text-hint)">' + e.person + ' &bull; ' + e.categoryLabel + '</div></div>' +
+      '</div>' +
+      '<span style="font-size:12px;font-weight:700;color:var(--red-700);font-family:var(--mono)">-' + fmtCurrency(e.amount) + '</span>' +
+    '</div>';
+  }).join('');
+  detail.innerHTML = html;
+}
+
+// ════ TIMELINE VIEW ════
+var currentExpenseView = 'list';
+
+function setExpenseView(view) {
+  currentExpenseView = view;
+  var listBtn = document.getElementById('viewList');
+  var tlBtn = document.getElementById('viewTimeline');
+  if (listBtn) listBtn.className = 'tl-toggle-btn' + (view==='list'?' active':'');
+  if (tlBtn) tlBtn.className = 'tl-toggle-btn' + (view==='timeline'?' active':'');
+  renderExpenses();
+}
+
+function renderTimeline(filtered) {
+  var list = document.getElementById('expenseList');
+  if (!list) return;
+  if (!filtered.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-hint)">Nenhum lançamento neste mês</div>';
+    return;
+  }
+
+  // Sort by date desc
+  var sorted = filtered.slice().sort(function(a,b) { return b.date.localeCompare(a.date); });
+
+  // Group by date
+  var grouped = {};
+  sorted.forEach(function(e) {
+    if (!grouped[e.date]) grouped[e.date] = [];
+    grouped[e.date].push(e);
+  });
+
+  var catColors = {
+    'alimentacao':'#378ADD','alimentação':'#378ADD',
+    'transporte':'#7F77DD','saude':'#E24B4A','saúde':'#E24B4A',
+    'lazer':'#D85A30','casa':'#1D9E75','vestuario':'#BA7517',
+    'vestuário':'#BA7517','educacao':'#534AB7','educação':'#534AB7',
+    'contas':'#1D9E75','outros':'#888780','pets':'#D85A30'
+  };
+
+  function getCatColor(cat) {
+    var key = (cat||'').toLowerCase().normalize('NFD').replace(/[^a-z]/g,'');
+    return catColors[key] || '#888780';
+  }
+
+  var now = new Date();
+  var todayStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  var yesterday = new Date(now); yesterday.setDate(now.getDate()-1);
+  var yestStr = yesterday.getFullYear()+'-'+String(yesterday.getMonth()+1).padStart(2,'0')+'-'+String(yesterday.getDate()).padStart(2,'0');
+
+  function dateLabel(d) {
+    if (d === todayStr) return 'Hoje';
+    if (d === yestStr) return 'Ontem';
+    var parts = d.split('-');
+    var dt = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+    var days = ['dom','seg','ter','qua','qui','sex','sab'];
+    var mths = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    return days[dt.getDay()] + ', ' + dt.getDate() + ' ' + mths[dt.getMonth()];
+  }
+
+  var html = '';
+  Object.keys(grouped).sort().reverse().forEach(function(date) {
+    var items = grouped[date];
+    html += '<div class="tl-day-sep">' + dateLabel(date) + '</div>';
+    items.forEach(function(e, i) {
+      var color = getCatColor(e.category || e.categoryLabel);
+      var isLast = i === items.length-1;
+      html += '<div class="tl-item">' +
+        '<div class="tl-spine">' +
+          '<div class="tl-dot" style="background:' + color + '"></div>' +
+          (!isLast ? '<div class="tl-line"></div>' : '') +
+        '</div>' +
+        '<div class="tl-content">' +
+          '<div class="tl-desc">' + e.description + '</div>' +
+          '<div class="tl-meta">' +
+            '<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:' + color + '22;color:' + color + ';font-size:10px;font-weight:600">' + e.categoryLabel + '</span>' +
+            ' <span style="font-size:10px;color:var(--text-hint)">' + e.person + '</span>' +
+            (e.isInstallment ? ' <span style="font-size:10px;color:var(--blue-700)">&#128179; ' + e.installmentNum + '/' + e.installmentTotal + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="tl-amt">-' + fmtCurrency(e.amount) + '</div>' +
+      '</div>';
+    });
+  });
+
+  list.innerHTML = html;
+}
+
 // ── Toast ──
 let toastTimer;
 function showToast(msg) {
@@ -5156,6 +5411,8 @@ window.addEventListener('popstate', function(e) {
   if (pendingValueModal && pendingValueModal.classList.contains('open')) { closePendingValueModal(); return; }
   const makeRecurModal = document.getElementById('makeRecurModal');
   if (makeRecurModal && makeRecurModal.classList.contains('open')) { closeMakeRecurModal(); return; }
+  const calModal = document.getElementById('calendarModal');
+  if (calModal && calModal.classList.contains('open')) { closeCalendarModal(); return; }
   const filterModal = document.getElementById('filterModal');
   if (filterModal && filterModal.classList.contains('open')) { closeFilterModal(); return; }
   const trashModal = document.getElementById('trashModal');
