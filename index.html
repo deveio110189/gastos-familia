@@ -1047,6 +1047,7 @@
 
       <div class="config-section">
         <div class="config-section-title">Dados locais</div>
+        <button class="btn-secondary" onclick="restoreHiddenCats()" style="margin-bottom:8px">🔄 Restaurar categorias excluídas</button>
         <button class="btn-secondary" onclick="exportAllData()" style="margin-bottom:8px">⬇️ Exportar todos os dados (CSV)</button>
         <button class="btn-secondary" onclick="migrateInstallments()" style="margin-bottom:8px">💳 Reorganizar parcelas existentes</button>
         <button class="btn-secondary" onclick="openTrashModal()" style="margin-bottom:8px">🗑️ Lixeira <span id="trashCount" style="background:var(--red-500);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px">0</span></button>
@@ -1497,6 +1498,7 @@ let categoryBudgets = {};
 let selectedCatIcon = '📋';
 let editingCatId = null;
 let deletingCatId = null;
+let deletingCatIsDefault = false;
 let editingCatBudgetId = null;
 
 function loadCategories() {
@@ -2853,7 +2855,7 @@ function renderCatScreen() {
           <button class="cat-card-btn" onclick="openCatHistory('${cat.id}')">📋</button>
           <button class="cat-card-btn" onclick="openCatBudgetModal('${cat.id}')">💰</button>
           <button class="cat-card-btn" onclick="openCatModal('${cat.id}')">✏️</button>
-          ${!isDefault ? `<button class="cat-card-btn del-btn" onclick="openDelCatModal('${cat.id}')">🗑️</button>` : ''}
+          <button class="cat-card-btn del-btn" onclick="tryDeleteCat('${cat.id}','${cat.label}',${isDefault})" title="${isDefault?'Excluir (requer senha)':'Excluir'}">🗑️</button>
         </div>
       </div>
       ${bgt > 0 ? `<div class="cat-card-progress"><div class="cat-budget-track"><div class="cat-budget-fill ${fc}" style="width:${pct.toFixed(1)}%"></div></div><div class="cat-budget-info" style="margin-top:3px">${fmtCurrency(spent)} / ${fmtCurrency(bgt)} — ${pct.toFixed(0)}%</div></div>` : ''}
@@ -2943,16 +2945,35 @@ function saveCatBudget() {
   showToast(val>0 ? `✅ Orçamento de ${fmtCurrency(val)} definido!` : '✅ Orçamento removido');
 }
 
-function openDelCatModal(catId) {
+function tryDeleteCat(catId, catLabel, isDefault) {
+  if (isDefault) {
+    openPwdModal(function() {
+      openDelCatModal(catId, catLabel, true);
+    });
+  } else {
+    openDelCatModal(catId, catLabel, false);
+  }
+}
+
+function openDelCatModal(catId, catLabel, isDefault) {
   deletingCatId = catId;
-  const cat = customCategories.find(c=>c.id===catId);
-  document.getElementById('delCatModalDesc').textContent = `Excluir "${cat?.label}"? Os gastos existentes não serão apagados.`;
+  deletingCatIsDefault = isDefault || false;
+  var cat = customCategories.find(function(c) { return c.id === catId; });
+  var label = catLabel || (cat && cat.label) || catId;
+  var desc = document.getElementById('delCatModalDesc');
+  if (desc) desc.textContent = 'Excluir "' + label + '"? Os gastos existentes nao serao apagados.';
   document.getElementById('delCatModal').classList.add('open');
 }
 function closeDelCatModal() { document.getElementById('delCatModal').classList.remove('open'); deletingCatId=null; }
 function confirmDeleteCat() {
   if (!deletingCatId) return;
-  customCategories = customCategories.filter(c=>c.id!==deletingCatId);
+  if (deletingCatIsDefault) {
+    // Add to a "hidden defaults" list
+    var hidden = JSON.parse(localStorage.getItem('fin_hidden_cats') || '[]');
+    if (!hidden.includes(deletingCatId)) hidden.push(deletingCatId);
+    localStorage.setItem('fin_hidden_cats', JSON.stringify(hidden));
+  }
+  customCategories = customCategories.filter(function(c) { return c.id !== deletingCatId; });
   delete categoryBudgets[deletingCatId];
   saveCategories(); closeDelCatModal(); renderCategoryGrid(); renderCatScreen(); vibrate([50,30,50]);
   showToast('🗑️ Categoria excluída');
@@ -3041,13 +3062,15 @@ function showReport() {
 const CONFIG_PASSWORD = '110189';
 let configUnlocked = false;
 
-function openPwdModal() {
-  if (configUnlocked) { showScreen('config'); return; }
+var _pwdCallback = null;
+function openPwdModal(callback) {
+  _pwdCallback = callback || null;
+  if (!callback && configUnlocked) { showScreen('config'); return; }
   document.getElementById('pwdInput').value = '';
   document.getElementById('pwdErrorMsg').textContent = '';
   document.getElementById('pwdInputWrap').classList.remove('error');
   document.getElementById('pwdModal').classList.add('open');
-  setTimeout(() => document.getElementById('pwdInput').focus(), 300);
+  setTimeout(function() { document.getElementById('pwdInput').focus(); }, 300);
 }
 
 function closePwdModal() {
@@ -3057,12 +3080,18 @@ function closePwdModal() {
 function checkPassword() {
   const entered = document.getElementById('pwdInput').value.trim();
   if (entered === CONFIG_PASSWORD) {
-    configUnlocked = true;
     closePwdModal();
-    showScreen('config');
-    vibrate(40);
-    // Lock again after 5 minutes of inactivity
-    setTimeout(() => { configUnlocked = false; }, 5 * 60 * 1000);
+    if (_pwdCallback) {
+      var cb = _pwdCallback;
+      _pwdCallback = null;
+      vibrate(40);
+      cb();
+    } else {
+      configUnlocked = true;
+      showScreen('config');
+      vibrate(40);
+      setTimeout(function() { configUnlocked = false; }, 5 * 60 * 1000);
+    }
   } else {
     const wrap = document.getElementById('pwdInputWrap');
     const msg = document.getElementById('pwdErrorMsg');
@@ -5004,6 +5033,14 @@ function toggleCatFilter(cat) {
   renderStats();
   if (filterCategory) showToast('Filtrando: ' + filterCategory);
   else showToast('Filtro removido');
+}
+
+function restoreHiddenCats() {
+  var hidden = JSON.parse(localStorage.getItem('fin_hidden_cats') || '[]');
+  if (!hidden.length) { showToast('Nenhuma categoria foi excluida'); return; }
+  localStorage.removeItem('fin_hidden_cats');
+  renderCatScreen();
+  showToast('Categorias restauradas!');
 }
 
 // ── Toast ──
