@@ -1804,8 +1804,8 @@ window.onFirebaseRecurring = function(data) {
   // After loading recurring from Firebase, auto-fix any missing categoryLabels
   setTimeout(autoFixRecurringCategories, 500);
   if (!data || !data.recurringExpenses) return;
-  const localUpdated = localStorage.getItem('fin_recurring_updated') || '';
-  if (data.updatedAt && data.updatedAt <= localUpdated) return;
+  // Always accept Firebase data — no timestamp guard for recurring
+  // (recurring list is small and safe to always sync)
   const localIds = new Set(recurringExpenses.map(r => r.id));
   let added = 0;
   data.recurringExpenses.forEach(rr => {
@@ -4916,8 +4916,11 @@ function confirmMakeRecur() {
   syncExpense(e);
   expenses.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
   saveToStorage();
+  // Sync all new future expenses to Firebase
+  expenses.forEach(function(exp) {
+    if (exp.recurringId === recurId) syncExpense(exp);
+  });
   saveRecurring();
-  // syncRecurring saves recurringExpenses to Firebase
   syncRecurring();
   closeMakeRecurModal();
   updateHeader();
@@ -5427,40 +5430,103 @@ function renderTimeline(filtered) {
   Object.keys(grouped).sort().reverse().forEach(function(date) {
     var items = grouped[date];
     html += '<div class="tl-day-sep">' + dateLabel(date) + '</div>';
+
+    // Separate recurring and installments on day 01 (same logic as list view)
+    var isFirst = date.endsWith('-01');
+    var installments = isFirst ? items.filter(function(e) { return e.isInstallment && (e.installmentNum||1) > 1; }) : [];
+    var recurring    = isFirst ? items.filter(function(e) { return e.isRecurring && !e.isPendingValue; }) : [];
+    var regular      = items.filter(function(e) {
+      return !(isFirst && e.isInstallment && (e.installmentNum||1) > 1) &&
+             !(isFirst && e.isRecurring && !e.isPendingValue);
+    });
+
+    // Render recurring group header
+    if (recurring.length > 0) {
+      var totalRecur = recurring.reduce(function(s,e) { return s+e.amount; }, 0);
+      var recurKey = 'tl-recur-' + date;
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--surface-raised);border-left:3px solid var(--green-500);margin-bottom:4px;cursor:pointer" onclick="toggleTlGroup(\'' + recurKey + '\')">' +
+        '<div style="width:10px;height:10px;border-radius:50%;background:var(--green-500);flex-shrink:0"></div>' +
+        '<div style="flex:1"><div style="font-size:13px;font-weight:700">&#128257; Gastos Fixos</div>' +
+        '<div style="font-size:11px;color:var(--text-hint)">' + recurring.length + ' lançamento(s)</div></div>' +
+        '<div style="font-size:13px;font-weight:700;color:var(--red-700);font-family:var(--mono)">-' + fmtCurrency(totalRecur) + '</div>' +
+        '<span style="font-size:11px;color:var(--text-hint)" id="' + recurKey + '-lbl">&#9660; ver</span>' +
+      '</div>' +
+      '<div id="' + recurKey + '" style="display:none">';
+      recurring.forEach(function(e) {
+        var color = getCatColor(e.category || e.categoryLabel);
+        html += buildTlItem(e, color, false);
+      });
+      html += '</div>';
+    }
+
+    // Render installment group header
+    if (installments.length > 0) {
+      var totalInst = installments.reduce(function(s,e) { return s+e.amount; }, 0);
+      var instKey = 'tl-inst-' + date;
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--surface-raised);border-left:3px solid var(--blue-400);margin-bottom:4px;cursor:pointer" onclick="toggleTlGroup(\'' + instKey + '\')">' +
+        '<div style="width:10px;height:10px;border-radius:50%;background:var(--blue-400);flex-shrink:0"></div>' +
+        '<div style="flex:1"><div style="font-size:13px;font-weight:700">&#128179; Compras parceladas</div>' +
+        '<div style="font-size:11px;color:var(--text-hint)">' + installments.length + ' parcela(s)</div></div>' +
+        '<div style="font-size:13px;font-weight:700;color:var(--red-700);font-family:var(--mono)">-' + fmtCurrency(totalInst) + '</div>' +
+        '<span style="font-size:11px;color:var(--text-hint)" id="' + instKey + '-lbl">&#9660; ver</span>' +
+      '</div>' +
+      '<div id="' + instKey + '" style="display:none">';
+      installments.forEach(function(e) {
+        var color = getCatColor(e.category || e.categoryLabel);
+        html += buildTlItem(e, color, false);
+      });
+      html += '</div>';
+    }
+
+    // Render regular items
+    items = regular;
     items.forEach(function(e, i) {
       var color = getCatColor(e.category || e.categoryLabel);
       var isLast = i === items.length-1;
-      var recurBtnHtml = (!e.isRecurring && !e.isInstallment)
-        ? '<button class="expense-action-btn" onclick="event.stopPropagation();openMakeRecurModal(\'' + e.id + '\')" title="Tornar fixo" style="font-size:11px">&#128257;</button>'
-        : '';
-      html += '<div class="tl-item">' +
-        '<div class="tl-spine">' +
-          '<div class="tl-dot" style="background:' + color + '"></div>' +
-          (!isLast ? '<div class="tl-line"></div>' : '') +
-        '</div>' +
-        '<div class="tl-content">' +
-          '<div class="tl-desc">' + e.description + '</div>' +
-          '<div class="tl-meta">' +
-            '<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:' + color + '22;color:' + color + ';font-size:10px;font-weight:600">' + e.categoryLabel + '</span>' +
-            ' <span style="font-size:10px;color:var(--text-hint)">' + e.person + '</span>' +
-            (e.isInstallment ? ' <span style="font-size:10px;color:var(--blue-700)">&#128179; ' + e.installmentNum + '/' + e.installmentTotal + '</span>' : '') +
-          '</div>' +
-        '</div>' +
-        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">' +
-          '<div class="tl-amt">-' + fmtCurrency(e.amount) + '</div>' +
-          '<div class="expense-actions">' +
-            recurBtnHtml +
-            '<button class="expense-action-btn" onclick="event.stopPropagation();openAddModal(\'' + e.id + '\')" title="Editar">&#9999;&#65039;</button>' +
-            '<button class="expense-action-btn del" onclick="event.stopPropagation();openDelModal(\'' + e.id + '\')" title="Excluir">&#128465;&#65039;</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
+      html += buildTlItem(e, color, !isLast);
     });
   });
-
   list.innerHTML = html;
 }
 
+
+
+function toggleTlGroup(key) {
+  var el = document.getElementById(key);
+  var lbl = document.getElementById(key + '-lbl');
+  if (!el) return;
+  var open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (lbl) lbl.textContent = open ? '&#9660; ver' : '&#9650; ocultar';
+}
+
+function buildTlItem(e, color, showLine) {
+  var recurBtnHtml = (!e.isRecurring && !e.isInstallment)
+    ? '<button class="expense-action-btn" onclick="event.stopPropagation();openMakeRecurModal(\'' + e.id + '\')" title="Tornar fixo" style="font-size:11px">&#128257;</button>'
+    : '';
+  return '<div class="tl-item">' +
+    '<div class="tl-spine">' +
+      '<div class="tl-dot" style="background:' + color + '"></div>' +
+      (showLine ? '<div class="tl-line"></div>' : '') +
+    '</div>' +
+    '<div class="tl-content">' +
+      '<div class="tl-desc">' + e.description + '</div>' +
+      '<div class="tl-meta">' +
+        '<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:' + color + '22;color:' + color + ';font-size:10px;font-weight:600">' + e.categoryLabel + '</span>' +
+        ' <span style="font-size:10px;color:var(--text-hint)">' + e.person + '</span>' +
+        (e.isInstallment ? ' <span style="font-size:10px;color:var(--blue-700)">&#128179; ' + e.installmentNum + '/' + e.installmentTotal + '</span>' : '') +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">' +
+      '<div class="tl-amt">-' + fmtCurrency(e.amount) + '</div>' +
+      '<div class="expense-actions">' +
+        recurBtnHtml +
+        '<button class="expense-action-btn" onclick="event.stopPropagation();openAddModal(\'' + e.id + '\')" title="Editar">&#9999;&#65039;</button>' +
+        '<button class="expense-action-btn del" onclick="event.stopPropagation();openDelModal(\'' + e.id + '\')" title="Excluir">&#128465;&#65039;</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
 // ════ TIMELINE ACTION SHEET ════
 var tlActionExpId = null;
 
