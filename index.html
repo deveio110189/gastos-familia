@@ -5430,7 +5430,10 @@ function renderTimeline(filtered) {
     items.forEach(function(e, i) {
       var color = getCatColor(e.category || e.categoryLabel);
       var isLast = i === items.length-1;
-      html += '<div class="tl-item" onclick="openTlActionSheet(\'' + e.id + '\')">' +
+      var recurBtnHtml = (!e.isRecurring && !e.isInstallment)
+        ? '<button class="expense-action-btn" onclick="event.stopPropagation();openMakeRecurModal(\'' + e.id + '\')" title="Tornar fixo" style="font-size:11px">&#128257;</button>'
+        : '';
+      html += '<div class="tl-item">' +
         '<div class="tl-spine">' +
           '<div class="tl-dot" style="background:' + color + '"></div>' +
           (!isLast ? '<div class="tl-line"></div>' : '') +
@@ -5443,7 +5446,14 @@ function renderTimeline(filtered) {
             (e.isInstallment ? ' <span style="font-size:10px;color:var(--blue-700)">&#128179; ' + e.installmentNum + '/' + e.installmentTotal + '</span>' : '') +
           '</div>' +
         '</div>' +
-        '<div class="tl-amt">-' + fmtCurrency(e.amount) + '</div>' +
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">' +
+          '<div class="tl-amt">-' + fmtCurrency(e.amount) + '</div>' +
+          '<div class="expense-actions">' +
+            recurBtnHtml +
+            '<button class="expense-action-btn" onclick="event.stopPropagation();openAddModal(\'' + e.id + '\')" title="Editar">&#9999;&#65039;</button>' +
+            '<button class="expense-action-btn del" onclick="event.stopPropagation();openDelModal(\'' + e.id + '\')" title="Excluir">&#128465;&#65039;</button>' +
+          '</div>' +
+        '</div>' +
       '</div>';
     });
   });
