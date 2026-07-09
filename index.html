@@ -144,11 +144,21 @@
     }
 
     /* ── Theme palettes ── */
-    [data-color="green"] { --theme-50:#E1F5EE;--theme-500:#1D9E75;--theme-700:#0F6E56;--theme-900:#085041; }
-    [data-color="blue"]  { --theme-50:#E6F1FB;--theme-500:#378ADD;--theme-700:#185FA5;--theme-900:#0C447C; }
-    [data-color="purple"]{ --theme-50:#EEEDFE;--theme-500:#7F77DD;--theme-700:#534AB7;--theme-900:#3C3489; }
-    [data-color="coral"] { --theme-50:#FAECE7;--theme-500:#D85A30;--theme-700:#993C1D;--theme-900:#712B13; }
-    [data-color="amber"] { --theme-50:#FAEEDA;--theme-500:#EF9F27;--theme-700:#BA7517;--theme-900:#854F0B; }
+    [data-color="green"]   { --theme-50:#E1F5EE;--theme-500:#1D9E75;--theme-700:#0F6E56;--theme-900:#085041; }
+    [data-color="blue"]    { --theme-50:#E6F1FB;--theme-500:#378ADD;--theme-700:#185FA5;--theme-900:#0C447C; }
+    [data-color="purple"]  { --theme-50:#EEEDFE;--theme-500:#7F77DD;--theme-700:#534AB7;--theme-900:#3C3489; }
+    [data-color="coral"]   { --theme-50:#FAECE7;--theme-500:#D85A30;--theme-700:#993C1D;--theme-900:#712B13; }
+    [data-color="amber"]   { --theme-50:#FAEEDA;--theme-500:#EF9F27;--theme-700:#BA7517;--theme-900:#854F0B; }
+    [data-color="emerald"] { --theme-50:#E0F7F4;--theme-500:#11998e;--theme-700:#0d7a71;--theme-900:#095c56; }
+    [data-color="fire"]    { --theme-50:#FEF0E6;--theme-500:#fc4a1a;--theme-700:#d93a10;--theme-900:#a82c0b; }
+    [data-color="aurora"]  { --theme-50:#EEF2FD;--theme-500:#4776e6;--theme-700:#2f5cc9;--theme-900:#1e3fa0; }
+    [data-color="midnight"]{ --theme-50:#E8EAF0;--theme-500:#0f3460;--theme-700:#0a254a;--theme-900:#061836; }
+    [data-color="wine"]    { --theme-50:#F5E8EE;--theme-500:#c94b4b;--theme-700:#a03636;--theme-900:#782626; }
+    [data-color="storm"]   { --theme-50:#E8EDF8;--theme-500:#4286f4;--theme-700:#2a6dd4;--theme-900:#1a50a8; }
+    [data-color="sunrise"] { --theme-50:#FEF8E6;--theme-500:#f7971e;--theme-700:#d47d10;--theme-900:#a86008; }
+    [data-color="rose"]    { --theme-50:#FDE8F8;--theme-500:#f093fb;--theme-700:#d465e0;--theme-900:#a83db8; }
+    [data-color="ocean"]   { --theme-50:#E6EEF2;--theme-500:#2c5364;--theme-700:#1e3d4a;--theme-900:#122834; }
+    [data-color="night"]   { --theme-50:#EEEDFE;--theme-500:#667eea;--theme-700:#4a5fd4;--theme-900:#3344b0; }
     [data-theme="light"] {
       --bg: #f4f2eb; --surface: #ffffff; --surface-raised: #fafaf7;
       --text: #1a1a18; --text-muted: #5F5E5A; --text-hint: #888780;
@@ -1001,13 +1011,26 @@
             <div style="font-size:14px;font-weight:600">Modo de exibição</div>
             <button id="themeToggleBtn" onclick="toggleTheme()" style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--border-strong);background:var(--surface);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;color:var(--text)">🌗 Auto</button>
           </div>
-          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Cor do tema</div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Cores solidas</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
             <button class="color-opt" data-color="green" onclick="applyColor('green')" style="width:36px;height:36px;border-radius:50%;background:#0F6E56;border:2px solid transparent;cursor:pointer" title="Verde"></button>
             <button class="color-opt" data-color="blue" onclick="applyColor('blue')" style="width:36px;height:36px;border-radius:50%;background:#185FA5;border:2px solid transparent;cursor:pointer" title="Azul"></button>
             <button class="color-opt" data-color="purple" onclick="applyColor('purple')" style="width:36px;height:36px;border-radius:50%;background:#534AB7;border:2px solid transparent;cursor:pointer" title="Roxo"></button>
             <button class="color-opt" data-color="coral" onclick="applyColor('coral')" style="width:36px;height:36px;border-radius:50%;background:#993C1D;border:2px solid transparent;cursor:pointer" title="Coral"></button>
             <button class="color-opt" data-color="amber" onclick="applyColor('amber')" style="width:36px;height:36px;border-radius:50%;background:#BA7517;border:2px solid transparent;cursor:pointer" title="Dourado"></button>
+          </div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Gradientes especiais</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="color-opt" data-color="emerald" onclick="applyColor('emerald')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#11998e,#38ef7d);border:2px solid transparent;cursor:pointer" title="Verde esmeralda"></button>
+            <button class="color-opt" data-color="fire" onclick="applyColor('fire')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#fc4a1a,#f7b733);border:2px solid transparent;cursor:pointer" title="Fogo"></button>
+            <button class="color-opt" data-color="aurora" onclick="applyColor('aurora')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#4776e6,#8e54e9);border:2px solid transparent;cursor:pointer" title="Aurora boreal"></button>
+            <button class="color-opt" data-color="midnight" onclick="applyColor('midnight')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#1a1a2e,#0f3460);border:2px solid transparent;cursor:pointer" title="Meia-noite"></button>
+            <button class="color-opt" data-color="wine" onclick="applyColor('wine')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#c94b4b,#4b134f);border:2px solid transparent;cursor:pointer" title="Vinho e cereja"></button>
+            <button class="color-opt" data-color="storm" onclick="applyColor('storm')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#373b44,#4286f4);border:2px solid transparent;cursor:pointer" title="Tempestade"></button>
+            <button class="color-opt" data-color="sunrise" onclick="applyColor('sunrise')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#f7971e,#ffd200);border:2px solid transparent;cursor:pointer" title="Amanhecer dourado"></button>
+            <button class="color-opt" data-color="rose" onclick="applyColor('rose')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#f093fb,#f5576c);border:2px solid transparent;cursor:pointer" title="Rosa vibrante"></button>
+            <button class="color-opt" data-color="ocean" onclick="applyColor('ocean')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0f2027,#2c5364);border:2px solid transparent;cursor:pointer" title="Oceano profundo"></button>
+            <button class="color-opt" data-color="night" onclick="applyColor('night')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);border:2px solid transparent;cursor:pointer" title="Roxo noturno"></button>
           </div>
         </div>
       </div>
@@ -4948,15 +4971,40 @@ function applyColor(color) {
   var el = document.getElementById('appHtml');
   if (el) el.setAttribute('data-color', color);
   updateColorBtns();
-  // Update header gradient
+  // Update header background (solid or gradient)
   var header = document.querySelector('.header');
   if (header) {
-    var colors = {
-      green: '#0F6E56', blue: '#185FA5', purple: '#534AB7',
-      coral: '#993C1D', amber: '#BA7517'
+    var themes = {
+      // Solid colors
+      green:    '#0F6E56',
+      blue:     '#185FA5',
+      purple:   '#534AB7',
+      coral:    '#993C1D',
+      amber:    '#BA7517',
+      // Gradients
+      emerald:  'linear-gradient(135deg,#11998e,#38ef7d)',
+      fire:     'linear-gradient(135deg,#fc4a1a,#f7b733)',
+      aurora:   'linear-gradient(135deg,#4776e6,#8e54e9)',
+      midnight: 'linear-gradient(135deg,#1a1a2e,#0f3460)',
+      wine:     'linear-gradient(135deg,#c94b4b,#4b134f)',
+      storm:    'linear-gradient(135deg,#373b44,#4286f4)',
+      sunrise:  'linear-gradient(135deg,#f7971e,#ffd200)',
+      rose:     'linear-gradient(135deg,#f093fb,#f5576c)',
+      ocean:    'linear-gradient(135deg,#0f2027,#2c5364)',
+      night:    'linear-gradient(135deg,#667eea,#764ba2)'
     };
-    header.style.background = colors[color] || colors.green;
+    header.style.background = themes[color] || themes.green;
   }
+  // Update splash screen color too
+  var splash = document.getElementById('splash');
+  var splashColors = {
+    green:'#0F6E56', blue:'#185FA5', purple:'#534AB7',
+    coral:'#993C1D', amber:'#BA7517',
+    emerald:'#11998e', fire:'#fc4a1a', aurora:'#4776e6',
+    midnight:'#1a1a2e', wine:'#c94b4b', storm:'#373b44',
+    sunrise:'#f7971e', rose:'#f093fb', ocean:'#0f2027', night:'#667eea'
+  };
+  if (splash) splash.style.background = splashColors[color] || splashColors.green;
 }
 
 function updateColorBtns() {
