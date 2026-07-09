@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <meta name="theme-color" content="#0f6e56" />
+  <meta name="theme-color" content="#0f6e56" id="themeColorMeta" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Gastos Família" />
@@ -4999,16 +4999,21 @@ function applyColor(color) {
   var bg = themes[color] || themes.green;
   // Set CSS variable on root so it persists over stylesheet
   document.documentElement.style.setProperty('--header-bg', bg);
-  // Also update splash
-  var splash = document.getElementById('splash');
+  // Solid colors for statusbar and splash (gradients need a single color)
   var splashColors = {
     green:'#0F6E56', blue:'#185FA5', purple:'#534AB7',
     coral:'#993C1D', amber:'#BA7517',
-    emerald:'#11998e', fire:'#fc4a1a', aurora:'#4776e6',
+    emerald:'#11998e', fire:'#c03a10', aurora:'#4776e6',
     midnight:'#1a1a2e', wine:'#c94b4b', storm:'#373b44',
-    sunrise:'#f7971e', rose:'#f093fb', ocean:'#0f2027', night:'#667eea'
+    sunrise:'#d47d10', rose:'#c040d0', ocean:'#0f2027', night:'#667eea'
   };
-  if (splash) splash.style.background = splashColors[color] || splashColors.green;
+  var solidColor = splashColors[color] || splashColors.green;
+  // Update statusbar (Android PWA)
+  var metaTheme = document.getElementById('themeColorMeta');
+  if (metaTheme) metaTheme.setAttribute('content', solidColor);
+  // Update splash
+  var splash = document.getElementById('splash');
+  if (splash) splash.style.background = solidColor;
 }
 
 function updateColorBtns() {
