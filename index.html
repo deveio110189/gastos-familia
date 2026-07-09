@@ -1843,6 +1843,14 @@ let currentMonthOffset = 0; // 0 = current month, -1 = last month, etc.
 
 // ── Init ──
 function init() {
+  // ── Restore saved preferences FIRST (before anything renders) ──
+  var savedTheme = localStorage.getItem('fin_theme') || 'auto';
+  var savedColor = localStorage.getItem('fin_color') || 'green';
+  var savedView  = localStorage.getItem('fin_expense_view') || 'list';
+  applyTheme(savedTheme);
+  applyColor(savedColor);
+  currentExpenseView = savedView;
+
   setTimeout(() => document.getElementById('splash').classList.add('hide'), 1800);
 
   // Load avatars in tabs
