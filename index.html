@@ -168,7 +168,7 @@
     #app { max-width: 430px; margin: 0 auto; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 
     /* Header */
-    .header { background: var(--green-700); padding: 20px 20px 0; flex-shrink: 0; position: relative; overflow: hidden; }
+    .header { background: var(--header-bg, var(--green-700)); padding: 20px 20px 0; flex-shrink: 0; position: relative; overflow: hidden; }
     .header::before { content: ''; position: absolute; top: -60px; right: -40px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.04); }
     .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
     .app-title { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.6); letter-spacing: 0.08em; text-transform: uppercase; }
@@ -4979,31 +4979,27 @@ function applyColor(color) {
   var el = document.getElementById('appHtml');
   if (el) el.setAttribute('data-color', color);
   updateColorBtns();
-  // Update header background (solid or gradient)
-  var header = document.querySelector('.header');
-  if (header) {
-    var themes = {
-      // Solid colors
-      green:    '#0F6E56',
-      blue:     '#185FA5',
-      purple:   '#534AB7',
-      coral:    '#993C1D',
-      amber:    '#BA7517',
-      // Gradients
-      emerald:  'linear-gradient(135deg,#11998e,#38ef7d)',
-      fire:     'linear-gradient(135deg,#fc4a1a,#f7b733)',
-      aurora:   'linear-gradient(135deg,#4776e6,#8e54e9)',
-      midnight: 'linear-gradient(135deg,#1a1a2e,#0f3460)',
-      wine:     'linear-gradient(135deg,#c94b4b,#4b134f)',
-      storm:    'linear-gradient(135deg,#373b44,#4286f4)',
-      sunrise:  'linear-gradient(135deg,#f7971e,#ffd200)',
-      rose:     'linear-gradient(135deg,#f093fb,#f5576c)',
-      ocean:    'linear-gradient(135deg,#0f2027,#2c5364)',
-      night:    'linear-gradient(135deg,#667eea,#764ba2)'
-    };
-    header.style.background = themes[color] || themes.green;
-  }
-  // Update splash screen color too
+  var themes = {
+    green:    '#0F6E56',
+    blue:     '#185FA5',
+    purple:   '#534AB7',
+    coral:    '#993C1D',
+    amber:    '#BA7517',
+    emerald:  'linear-gradient(135deg,#11998e,#38ef7d)',
+    fire:     'linear-gradient(135deg,#fc4a1a,#f7b733)',
+    aurora:   'linear-gradient(135deg,#4776e6,#8e54e9)',
+    midnight: 'linear-gradient(135deg,#1a1a2e,#0f3460)',
+    wine:     'linear-gradient(135deg,#c94b4b,#4b134f)',
+    storm:    'linear-gradient(135deg,#373b44,#4286f4)',
+    sunrise:  'linear-gradient(135deg,#f7971e,#ffd200)',
+    rose:     'linear-gradient(135deg,#f093fb,#f5576c)',
+    ocean:    'linear-gradient(135deg,#0f2027,#2c5364)',
+    night:    'linear-gradient(135deg,#667eea,#764ba2)'
+  };
+  var bg = themes[color] || themes.green;
+  // Set CSS variable on root so it persists over stylesheet
+  document.documentElement.style.setProperty('--header-bg', bg);
+  // Also update splash
   var splash = document.getElementById('splash');
   var splashColors = {
     green:'#0F6E56', blue:'#185FA5', purple:'#534AB7',
