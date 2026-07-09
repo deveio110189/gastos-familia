@@ -1468,6 +1468,44 @@
     </div>
   </div>
 
+  <!-- Timeline Action Sheet -->
+  <div class="modal-overlay" id="tlActionSheet" onclick="if(event.target===this)closeTlActionSheet()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:4px 0 16px">
+        <span id="tlActionIcon" style="font-size:24px"></span>
+        <div>
+          <div id="tlActionDesc" style="font-size:15px;font-weight:700;color:var(--text)"></div>
+          <div id="tlActionMeta" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div>
+        </div>
+        <div id="tlActionAmt" style="margin-left:auto;font-size:16px;font-weight:700;color:var(--red-700);font-family:var(--mono)"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button onclick="tlActionEdit()" style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-raised);cursor:pointer;font-family:var(--font);width:100%;text-align:left">
+          <span style="font-size:20px">✏️</span>
+          <div>
+            <div style="font-size:14px;font-weight:600">Editar gasto</div>
+            <div style="font-size:12px;color:var(--text-hint);margin-top:2px">Alterar valor, categoria ou descrição</div>
+          </div>
+        </button>
+        <button id="tlActionRecurBtn" onclick="tlActionMakeRecur()" style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface-raised);cursor:pointer;font-family:var(--font);width:100%;text-align:left">
+          <span style="font-size:20px">🔁</span>
+          <div>
+            <div style="font-size:14px;font-weight:600">Tornar gasto fixo</div>
+            <div style="font-size:12px;color:var(--text-hint);margin-top:2px">Repetir automaticamente nos próximos meses</div>
+          </div>
+        </button>
+        <button onclick="tlActionDelete()" style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--radius-sm);border:1.5px solid var(--red-200,#fca5a5);background:var(--red-50);cursor:pointer;font-family:var(--font);width:100%;text-align:left">
+          <span style="font-size:20px">🗑️</span>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--red-700)">Excluir gasto</div>
+            <div style="font-size:12px;color:var(--text-hint);margin-top:2px">Mover para a lixeira</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Exit Modal -->
   <div class="exit-modal-overlay" id="exitModal">
     <div class="exit-modal-box">
@@ -5392,7 +5430,7 @@ function renderTimeline(filtered) {
     items.forEach(function(e, i) {
       var color = getCatColor(e.category || e.categoryLabel);
       var isLast = i === items.length-1;
-      html += '<div class="tl-item">' +
+      html += '<div class="tl-item" onclick="openTlActionSheet(\'' + e.id + '\')">' +
         '<div class="tl-spine">' +
           '<div class="tl-dot" style="background:' + color + '"></div>' +
           (!isLast ? '<div class="tl-line"></div>' : '') +
@@ -5411,6 +5449,53 @@ function renderTimeline(filtered) {
   });
 
   list.innerHTML = html;
+}
+
+// ════ TIMELINE ACTION SHEET ════
+var tlActionExpId = null;
+
+function openTlActionSheet(expId) {
+  var e = expenses.find(function(x) { return x.id === expId; });
+  if (!e) return;
+  tlActionExpId = expId;
+
+  var iconEl = document.getElementById('tlActionIcon');
+  var descEl = document.getElementById('tlActionDesc');
+  var metaEl = document.getElementById('tlActionMeta');
+  var amtEl  = document.getElementById('tlActionAmt');
+  var recurBtn = document.getElementById('tlActionRecurBtn');
+
+  if (iconEl) iconEl.textContent = e.categoryIcon || '💸';
+  if (descEl) descEl.textContent = e.description;
+  if (metaEl) metaEl.textContent = e.person + ' · ' + e.categoryLabel + ' · ' + e.date.split('-').reverse().join('/');
+  if (amtEl)  amtEl.textContent  = '-' + fmtCurrency(e.amount);
+
+  // Hide "tornar fixo" for recurring/installment expenses
+  if (recurBtn) {
+    recurBtn.style.display = (e.isRecurring || e.isInstallment) ? 'none' : 'flex';
+  }
+
+  document.getElementById('tlActionSheet').classList.add('open');
+}
+
+function closeTlActionSheet() {
+  document.getElementById('tlActionSheet').classList.remove('open');
+  tlActionExpId = null;
+}
+
+function tlActionEdit() {
+  closeTlActionSheet();
+  if (tlActionExpId) setTimeout(function() { openAddModal(tlActionExpId); }, 200);
+}
+
+function tlActionDelete() {
+  closeTlActionSheet();
+  if (tlActionExpId) setTimeout(function() { openDelModal(tlActionExpId); }, 200);
+}
+
+function tlActionMakeRecur() {
+  closeTlActionSheet();
+  if (tlActionExpId) setTimeout(function() { openMakeRecurModal(tlActionExpId); }, 200);
 }
 
 // ── Toast ──
@@ -5481,6 +5566,8 @@ window.addEventListener('popstate', function(e) {
   if (pendingValueModal && pendingValueModal.classList.contains('open')) { closePendingValueModal(); return; }
   const makeRecurModal = document.getElementById('makeRecurModal');
   if (makeRecurModal && makeRecurModal.classList.contains('open')) { closeMakeRecurModal(); return; }
+  const tlActionSheet = document.getElementById('tlActionSheet');
+  if (tlActionSheet && tlActionSheet.classList.contains('open')) { closeTlActionSheet(); return; }
   const calModal = document.getElementById('calendarModal');
   if (calModal && calModal.classList.contains('open')) { closeCalendarModal(); return; }
   const filterModal = document.getElementById('filterModal');
