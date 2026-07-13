@@ -777,7 +777,6 @@
           <span style="font-size:10px;color:var(--text-hint)">▼</span>
         </button>
           <button onclick="openCalendarModal()" title="Ver calendario" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:16px;flex-shrink:0">&#128197;</button>
-          <button id="editCycleBtn" onclick="openCycleEditModal()" title="Ajustar datas deste ciclo" style="display:none;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:14px;flex-shrink:0">&#9999;&#65039;</button>
         </div>
         <button class="current-user-badge w" id="currentUserBadge" onclick="showUserSelect()" title="Trocar usuario">
           <span id="currentUserIcon">W</span>
@@ -971,25 +970,6 @@
             <p style="font-size:12px;color:var(--text-hint);margin-top:6px">Quanto quer guardar todo mês. O app mostra quanto ainda pode gastar.</p>
           </div>
           <button class="btn-primary" onclick="saveBudget()">Salvar meta de economia</button>
-        </div>
-      </div>
-
-      <div class="config-section">
-        <div class="config-section-title">Período de exibição</div>
-        <div class="card">
-          <p style="font-size:12px;color:var(--text-hint);margin-bottom:12px">Como agrupar os lançamentos: pelo mês do calendário ou pelo ciclo da fatura do cartão.</p>
-          <div class="filter-options" style="margin-bottom:4px">
-            <button class="filter-option" id="viewModeCalBtn" onclick="setViewModePref('calendar')">📅 Mês calendário</button>
-            <button class="filter-option" id="viewModeFaturaBtn" onclick="setViewModePref('fatura')">💳 Fatura do cartão</button>
-          </div>
-          <div id="faturaDayRow" style="display:none;margin-top:14px">
-            <div class="form-group">
-              <label class="form-label">Dia de vencimento da fatura</label>
-              <input type="number" class="text-input" id="faturaDayInput" min="1" max="31" placeholder="Ex: 28" />
-            </div>
-            <p style="font-size:12px;color:var(--text-hint);margin-top:-8px;margin-bottom:10px">Ex: vencimento dia 28 → os gastos de 29 do mês anterior até 28 deste mês entram no mesmo ciclo.</p>
-            <button class="btn-primary" onclick="saveFaturaDay()">Salvar dia de vencimento</button>
-          </div>
         </div>
       </div>
 
@@ -1344,6 +1324,37 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-title">Filtrar e ordenar</div>
+
+      <div class="filter-section-title">Período</div>
+      <div class="filter-options" style="margin-bottom:2px">
+        <button class="filter-option" id="viewModeCalBtn" onclick="setViewModePref('calendar')">📅 Mês calendário</button>
+        <button class="filter-option" id="viewModeFaturaBtn" onclick="setViewModePref('fatura')">💳 Fatura do cartão</button>
+      </div>
+      <div id="faturaSettingsBlock" style="display:none;margin-top:12px;margin-bottom:8px">
+        <div class="form-group">
+          <label class="form-label">Dia de vencimento padrão</label>
+          <input type="number" class="text-input" id="faturaDayInput" min="1" max="31" placeholder="Ex: 28" onchange="saveFaturaDay()" />
+        </div>
+        <div style="background:var(--surface-raised);border-radius:12px;padding:12px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px">Ajustar este ciclo específico</div>
+          <p style="font-size:11px;color:var(--text-hint);margin-top:-4px;margin-bottom:10px">Use quando a fatura fechar antes ou depois do padrão — por feriado ou fim de semana, por exemplo.</p>
+          <div style="display:flex;gap:8px">
+            <div class="form-group" style="flex:1;margin-bottom:0">
+              <label class="form-label">Abertura</label>
+              <input type="date" class="text-input" id="cycleStartInput" />
+            </div>
+            <div class="form-group" style="flex:1;margin-bottom:0">
+              <label class="form-label">Fechamento</label>
+              <input type="date" class="text-input" id="cycleEndInput" />
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn-secondary" id="cycleResetBtn" onclick="resetCycleEdit()" style="display:none;flex:1;margin:0">↩️ Automático</button>
+            <button class="btn-primary" style="flex:1;margin:0" onclick="saveCycleEdit()">Salvar ciclo</button>
+          </div>
+        </div>
+      </div>
+
       <div class="filter-section-title">Ordenar por</div>
       <div class="filter-options">
         <button class="filter-option sel" id="fsort-date" onclick="setSort('date')">📅 Data</button>
@@ -1407,25 +1418,6 @@
         <label class="form-label">Ou escolha um mês específico</label>
         <input type="month" class="text-input" id="monthPickerInput" onchange="applyMonthPicker()" />
       </div>
-    </div>
-  </div>
-
-  <!-- Cycle Edit Modal (fatura) -->
-  <div class="modal-overlay" id="cycleEditModal" onclick="if(event.target===this)closeCycleEditModal()">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-title">✏️ Ajustar datas deste ciclo</div>
-      <p style="font-size:12px;color:var(--text-hint);margin-top:-8px;margin-bottom:16px">Use quando a fatura fechar antes ou depois do dia de vencimento padrão — por exemplo, por causa de feriado ou fim de semana. O ajuste vale só para este ciclo.</p>
-      <div class="form-group">
-        <label class="form-label">Abertura do ciclo</label>
-        <input type="date" class="text-input" id="cycleStartInput" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Fechamento do ciclo</label>
-        <input type="date" class="text-input" id="cycleEndInput" />
-      </div>
-      <button class="btn-primary" onclick="saveCycleEdit()">Salvar datas deste ciclo</button>
-      <button class="btn-secondary" id="cycleResetBtn" onclick="resetCycleEdit()" style="display:none;margin-top:8px;margin-bottom:0">↩️ Voltar ao cálculo automático</button>
     </div>
   </div>
 
@@ -2160,19 +2152,20 @@ function getFaturaCycleRange(offset) {
   return { start: localDateStr(startDateObj), end: localDateStr(endDateObj) };
 }
 
-// ── Modal de ajuste manual do ciclo ──
-function openCycleEditModal() {
+// ── Ajuste manual do ciclo (embutido no modal Filtrar) ──
+// Preenche os campos de abertura/fechamento do ciclo ATUALMENTE em exibição.
+// Chamado sempre que o modal Filtrar abre e sempre que o modo é alternado
+// entre calendário/fatura enquanto o modal já está aberto.
+function refreshCycleEditFields() {
   if (viewMode !== 'fatura') return;
   const range = getFaturaCycleRange(currentMonthOffset);
   const key = faturaCycleKey(currentMonthOffset);
-  document.getElementById('cycleStartInput').value = range.start;
-  document.getElementById('cycleEndInput').value = range.end;
+  const s = document.getElementById('cycleStartInput');
+  const e = document.getElementById('cycleEndInput');
+  if (s) s.value = range.start;
+  if (e) e.value = range.end;
   const resetBtn = document.getElementById('cycleResetBtn');
   if (resetBtn) resetBtn.style.display = faturaOverrides[key] ? 'block' : 'none';
-  document.getElementById('cycleEditModal').classList.add('open');
-}
-function closeCycleEditModal() {
-  document.getElementById('cycleEditModal').classList.remove('open');
 }
 function saveCycleEdit() {
   const start = document.getElementById('cycleStartInput').value;
@@ -2182,7 +2175,7 @@ function saveCycleEdit() {
   const key = faturaCycleKey(currentMonthOffset);
   faturaOverrides[key] = { start, end };
   localStorage.setItem('fin_fatura_overrides', JSON.stringify(faturaOverrides));
-  closeCycleEditModal();
+  refreshCycleEditFields();
   refreshAfterCycleChange();
   showToast('✅ Datas do ciclo salvas');
 }
@@ -2190,7 +2183,7 @@ function resetCycleEdit() {
   const key = faturaCycleKey(currentMonthOffset);
   delete faturaOverrides[key];
   localStorage.setItem('fin_fatura_overrides', JSON.stringify(faturaOverrides));
-  closeCycleEditModal();
+  refreshCycleEditFields();
   refreshAfterCycleChange();
   showToast('↩️ Ciclo voltou ao cálculo automático');
 }
@@ -2227,6 +2220,7 @@ function setViewModePref(mode) {
   viewMode = mode;
   localStorage.setItem('fin_view_mode', mode);
   updateViewModeUI();
+  refreshCycleEditFields();
   refreshAfterCycleChange();
   showToast(mode === 'fatura' ? '💳 Exibindo por ciclo de fatura' : '📅 Exibindo por mês calendário');
 }
@@ -2236,12 +2230,10 @@ function updateViewModeUI() {
   const faBtn = document.getElementById('viewModeFaturaBtn');
   if (calBtn) calBtn.className = 'filter-option' + (viewMode === 'calendar' ? ' sel' : '');
   if (faBtn) faBtn.className = 'filter-option' + (viewMode === 'fatura' ? ' sel' : '');
-  const row = document.getElementById('faturaDayRow');
-  if (row) row.style.display = viewMode === 'fatura' ? 'block' : 'none';
+  const block = document.getElementById('faturaSettingsBlock');
+  if (block) block.style.display = viewMode === 'fatura' ? 'block' : 'none';
   const inp = document.getElementById('faturaDayInput');
   if (inp && document.activeElement !== inp) inp.value = faturaDueDay;
-  const editBtn = document.getElementById('editCycleBtn');
-  if (editBtn) editBtn.style.display = viewMode === 'fatura' ? 'inline-flex' : 'none';
 }
 
 function saveFaturaDay() {
@@ -2250,6 +2242,7 @@ function saveFaturaDay() {
   if (!val || val < 1 || val > 31) { showToast('⚠️ Informe um dia entre 1 e 31'); return; }
   faturaDueDay = val;
   localStorage.setItem('fin_fatura_day', String(val));
+  refreshCycleEditFields();
   refreshAfterCycleChange();
   showToast('💳 Dia de vencimento salvo: ' + val);
 }
@@ -4639,6 +4632,9 @@ function updateUserUI() {
 
 // ════ FILTER MODAL ════
 function openFilterModal() {
+  // Reflect view period (calendar/fatura + cycle override) in modal
+  updateViewModeUI();
+  refreshCycleEditFields();
   // Reflect current view in modal
   var listBtn = document.getElementById('fsort-view-list');
   var tlBtn = document.getElementById('fsort-view-timeline');
