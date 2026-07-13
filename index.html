@@ -974,6 +974,25 @@
       </div>
 
       <div class="config-section">
+        <div class="config-section-title">Período de exibição</div>
+        <div class="card">
+          <p style="font-size:12px;color:var(--text-hint);margin-bottom:12px">Como agrupar os lançamentos: pelo mês do calendário ou pelo ciclo da fatura do cartão.</p>
+          <div class="filter-options" style="margin-bottom:4px">
+            <button class="filter-option" id="viewModeCalBtn" onclick="setViewModePref('calendar')">📅 Mês calendário</button>
+            <button class="filter-option" id="viewModeFaturaBtn" onclick="setViewModePref('fatura')">💳 Fatura do cartão</button>
+          </div>
+          <div id="faturaDayRow" style="display:none;margin-top:14px">
+            <div class="form-group">
+              <label class="form-label">Dia de vencimento da fatura</label>
+              <input type="number" class="text-input" id="faturaDayInput" min="1" max="31" placeholder="Ex: 28" />
+            </div>
+            <p style="font-size:12px;color:var(--text-hint);margin-top:-8px;margin-bottom:10px">Ex: vencimento dia 28 → os gastos de 29 do mês anterior até 28 deste mês entram no mesmo ciclo.</p>
+            <button class="btn-primary" onclick="saveFaturaDay()">Salvar dia de vencimento</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-section">
         <div class="config-section-title">Firebase</div>
         <div class="card">
           <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
@@ -1896,6 +1915,7 @@ function init() {
   applyTheme(savedTheme);
   applyColor(savedColor);
   currentExpenseView = savedView;
+  updateViewModeUI();
 
   setTimeout(() => document.getElementById('splash').classList.add('hide'), 1800);
 
@@ -1942,7 +1962,7 @@ function init() {
   em.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   // Default custom range: first day of month to today
   const firstDay = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-  const today = now.toISOString().split('T')[0];
+  const today = localDateStr(now);
   const dfrom = document.getElementById('exportDateFrom');
   const dto = document.getElementById('exportDateTo');
   if (dfrom) dfrom.value = firstDay;
@@ -2055,17 +2075,132 @@ function getViewMonth() {
 }
 
 function getViewMonthPrefix() {
+  // Mantida para usos que só precisam do "mês nominal" (ex: exportações,
+  // relatório anual). A listagem principal usa getViewDateRange() abaixo,
+  // que respeita o modo de exibição (mês calendário ou ciclo de fatura).
   const { year, month } = getViewMonth();
   return `${year}-${String(month).padStart(2,'0')}`;
 }
 
+// ── Modo de exibição: mês calendário ou ciclo de fatura do cartão ──
+// currentMonthOffset é reaproveitado nos dois modos: em modo calendário
+// conta meses; em modo fatura conta ciclos. As duas leituras nunca
+// coexistem, então a variável única continua servindo à navegação (setas,
+// seletor de mês) sem precisar de estado duplicado.
+let viewMode = localStorage.getItem('fin_view_mode') || 'calendar'; // 'calendar' | 'fatura'
+let faturaDueDay = parseInt(localStorage.getItem('fin_fatura_day') || '28', 10);
+if (isNaN(faturaDueDay) || faturaDueDay < 1 || faturaDueDay > 31) faturaDueDay = 28;
+
+// Calcula o intervalo [início, fim] do ciclo de fatura para um dado offset.
+// Ex: vencimento dia 28 → ciclo vai de 29 do mês anterior até 28 do mês atual.
+// Usa objetos Date (não aritmética manual de mês/ano) para que a virada de
+// ano e meses com menos dias sejam normalizados automaticamente pelo motor
+// JS, evitando a classe de bug que já corrigimos no fuso horário.
+function getFaturaCycleRange(offset) {
+  const now = new Date();
+  const y = now.getFullYear();
+  let closeMonth = now.getMonth(); // 0-indexed
+  // Se já passamos do dia de vencimento este mês, o ciclo "aberto agora"
+  // fecha no PRÓXIMO mês.
+  if (now.getDate() > faturaDueDay) closeMonth += 1;
+  closeMonth += offset;
+
+  const daysInCloseMonth = new Date(y, closeMonth + 1, 0).getDate();
+  const closeDay = Math.min(faturaDueDay, daysInCloseMonth);
+  const endDateObj = new Date(y, closeMonth, closeDay);
+
+  const prevDaysInMonth = new Date(y, closeMonth, 0).getDate();
+  const prevCloseDay = Math.min(faturaDueDay, prevDaysInMonth);
+  const startDateObj = new Date(y, closeMonth - 1, prevCloseDay + 1);
+
+  return { start: localDateStr(startDateObj), end: localDateStr(endDateObj) };
+}
+
+// Fonte única do intervalo de datas "em exibição" — respeita o modo ativo.
+function getViewDateRange() {
+  if (viewMode === 'fatura') return getFaturaCycleRange(currentMonthOffset);
+  const { year, month } = getViewMonth();
+  const start = `${year}-${String(month).padStart(2,'0')}-01`;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const end = `${year}-${String(month).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`;
+  return { start, end };
+}
+
+// Filtro central: substitui o antigo `e.date.startsWith(prefix)` em todas as
+// telas que mostram "o período atual" (lista, header, stats, categorias,
+// lançamento rápido, meta de economia). Um único lugar entende os dois modos.
+function filterExpensesInView(exps) {
+  const { start, end } = getViewDateRange();
+  return exps.filter(e => e.date >= start && e.date <= end);
+}
+
+function setViewModePref(mode) {
+  viewMode = mode;
+  localStorage.setItem('fin_view_mode', mode);
+  updateViewModeUI();
+  updateMonthLabel();
+  updateHeader();
+  renderExpenses();
+  if (document.getElementById('screen-stats') && document.getElementById('screen-stats').classList.contains('active')) {
+    renderStats();
+    if (typeof renderMonthlyChart === 'function') renderMonthlyChart();
+  }
+  showToast(mode === 'fatura' ? '💳 Exibindo por ciclo de fatura' : '📅 Exibindo por mês calendário');
+}
+
+function updateViewModeUI() {
+  const calBtn = document.getElementById('viewModeCalBtn');
+  const faBtn = document.getElementById('viewModeFaturaBtn');
+  if (calBtn) calBtn.className = 'filter-option' + (viewMode === 'calendar' ? ' sel' : '');
+  if (faBtn) faBtn.className = 'filter-option' + (viewMode === 'fatura' ? ' sel' : '');
+  const row = document.getElementById('faturaDayRow');
+  if (row) row.style.display = viewMode === 'fatura' ? 'block' : 'none';
+  const inp = document.getElementById('faturaDayInput');
+  if (inp && document.activeElement !== inp) inp.value = faturaDueDay;
+}
+
+function saveFaturaDay() {
+  const inp = document.getElementById('faturaDayInput');
+  const val = parseInt(inp.value, 10);
+  if (!val || val < 1 || val > 31) { showToast('⚠️ Informe um dia entre 1 e 31'); return; }
+  faturaDueDay = val;
+  localStorage.setItem('fin_fatura_day', String(val));
+  updateMonthLabel();
+  updateHeader();
+  renderExpenses();
+  if (document.getElementById('screen-stats') && document.getElementById('screen-stats').classList.contains('active')) {
+    renderStats();
+    if (typeof renderMonthlyChart === 'function') renderMonthlyChart();
+  }
+  showToast('💳 Dia de vencimento salvo: ' + val);
+}
+
+// ── Data local (YYYY-MM-DD) sem conversão para UTC ──
+// BUG CORRIGIDO: `new Date().toISOString().split('T')[0]` converte para UTC,
+// e como o Brasil é UTC-3 (sem horário de verão), a partir das 21h o dia em
+// UTC já é o dia seguinte. Isso fazia o app "adiantar" a data à noite.
+// Esta função usa os componentes LOCAIS do Date, sempre fiéis ao fuso do
+// usuário, e é a única forma correta de obter "hoje" ou "a data de X" no app.
+function localDateStr(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function updateMonthLabel() {
+  const el = document.getElementById('monthLabel');
+  const pickerLabel = document.getElementById('monthPickerLabel');
+  if (viewMode === 'fatura') {
+    const { start, end } = getFaturaCycleRange(currentMonthOffset);
+    const shortDM = (s) => { const p = s.split('-'); return p[2] + '/' + p[1]; };
+    const label = `💳 ${shortDM(start)}–${shortDM(end)}`;
+    if (el) el.textContent = label;
+    if (pickerLabel) pickerLabel.textContent = currentMonthOffset > 0 ? `${label} 📅` : label;
+    return;
+  }
   const { year, month } = getViewMonth();
   const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const label = `${months[month-1]} ${year}`;
-  const el = document.getElementById('monthLabel');
   if (el) el.textContent = label;
-  const pickerLabel = document.getElementById('monthPickerLabel');
   if (pickerLabel) pickerLabel.textContent = currentMonthOffset > 0 ? `${label} 📅` : label;
 }
 
@@ -2144,7 +2279,7 @@ function selectPerson(p) {
 }
 
 function setDefaultDate() {
-  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  document.getElementById('dateInput').value = localDateStr();
 }
 
 // ── Modal ──
@@ -2313,8 +2448,7 @@ function renderExpenses() {
   // Global search: when the user is searching, look across ALL months instead
   // of only the current one. Everything's already in memory, so this is free.
   if (searchQuery) { renderGlobalSearch(list); return; }
-  const prefix = getViewMonthPrefix();
-  let filtered = expenses.filter(e => e.date.startsWith(prefix));
+  let filtered = filterExpensesInView(expenses);
   if (filterPerson_ !== 'Todos') filtered = filtered.filter(e => e.person === filterPerson_);
   if (filterCategory) filtered = filtered.filter(e => e.categoryLabel === filterCategory);
   if (searchQuery) {
@@ -2361,8 +2495,8 @@ function renderExpenses() {
   const grouped = {};
   nonPending.forEach(e => { if (!grouped[e.date]) grouped[e.date] = []; grouped[e.date].push(e); });
 
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now()-86400000).toISOString().split('T')[0];
+  const today = localDateStr();
+  const yesterday = localDateStr(new Date(Date.now()-86400000));
 
   function renderExpenseItem(e) {
     return `
@@ -2552,8 +2686,7 @@ function togglePendingGroup() {
 
 // ── Update header ──
 function updateHeader() {
-  const prefix = getViewMonthPrefix();
-  const month = expenses.filter(e => e.date.startsWith(prefix));
+  const month = filterExpensesInView(expenses);
   const total = month.reduce((s,e) => s+e.amount, 0);
   const wTotal = month.filter(e=>e.person==='Welinton').reduce((s,e)=>s+e.amount,0);
   const dTotal = month.filter(e=>e.person==='Débora').reduce((s,e)=>s+e.amount,0);
@@ -2602,8 +2735,7 @@ function updateHeader() {
 
   // Per-category budget alerts
   const catAlerts = [];
-  const prefixCA = getViewMonthPrefix();
-  const monthExpCA = expenses.filter(e => e.date.startsWith(prefixCA));
+  const monthExpCA = filterExpensesInView(expenses);
   getAllCategories().forEach(cat => {
     const cb = categoryBudgets[cat.id]; if (!cb) return;
     const cs = monthExpCA.filter(e => {
@@ -2689,8 +2821,7 @@ function toggleAlerts() {
 
 // ── Stats ──
 function renderStats() {
-  const prefix = getViewMonthPrefix();
-  const month = expenses.filter(e => e.date.startsWith(prefix));
+  const month = filterExpensesInView(expenses);
   const total = month.reduce((s,e)=>s+e.amount,0);
   const wTotal = month.filter(e=>e.person==='Welinton').reduce((s,e)=>s+e.amount,0);
   const dTotal = month.filter(e=>e.person==='Débora').reduce((s,e)=>s+e.amount,0);
@@ -3074,8 +3205,7 @@ async function exportToSheets() {
 
 // ── Categories Screen ──
 function renderCatScreen() {
-  const prefix = getViewMonthPrefix();
-  const monthExp = expenses.filter(e => e.date.startsWith(prefix));
+  const monthExp = filterExpensesInView(expenses);
   const allCats = getAllCategories();
   document.getElementById('catScreenGrid').innerHTML = allCats.map(cat => {
     const spent = monthExp.filter(e => {
@@ -3407,7 +3537,7 @@ function saveRecurring() {
 
 function checkAndLaunchRecurring() {
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = localDateStr(today);
   const currentMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
   let changed = false;
 
@@ -3703,7 +3833,7 @@ function deleteRecur(id) {
 function openCatHistory(catId) {
   const cat = getAllCategories().find(c => c.id === catId);
   if (!cat) return;
-  const prefix = getViewMonthPrefix();
+  const { start, end } = getViewDateRange();
   const { year, month } = getViewMonth();
   const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -3712,13 +3842,16 @@ function openCatHistory(catId) {
                      e.categoryLabel === cat.label ||
                      (e.category||'').toLowerCase() === catId.toLowerCase() ||
                      normStr(e.categoryLabel) === normStr(cat.label);
-    return matchCat && e.date.startsWith(prefix);
+    return matchCat && e.date >= start && e.date <= end;
   })
     .sort((a,b) => b.date.localeCompare(a.date));
 
   document.getElementById('catHistIcon').textContent = cat.icon;
   document.getElementById('catHistTitle').textContent = cat.label;
-  document.getElementById('catHistPeriod').textContent = `${months[month-1]}/${year} · ${filtered.length} lançamento(s)`;
+  const periodLabel = viewMode === 'fatura'
+    ? `Fatura ${start.split('-')[2]}/${start.split('-')[1]}–${end.split('-')[2]}/${end.split('-')[1]}`
+    : `${months[month-1]}/${year}`;
+  document.getElementById('catHistPeriod').textContent = `${periodLabel} · ${filtered.length} lançamento(s)`;
 
   const total = filtered.reduce((s,e) => s+e.amount, 0);
   document.getElementById('catHistTotal').textContent = fmtCurrency(total);
@@ -3727,8 +3860,8 @@ function openCatHistory(catId) {
   if (!filtered.length) {
     document.getElementById('catHistList').innerHTML = '<div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-title">Sem gastos</div><div class="empty-desc">Nenhum lançamento nesta categoria este mês</div></div>';
   } else {
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now()-86400000).toISOString().split('T')[0];
+    const today = localDateStr();
+    const yesterday = localDateStr(new Date(Date.now()-86400000));
     document.getElementById('catHistList').innerHTML = filtered.map(e => {
       const d = new Date(e.date+'T12:00:00');
       const label = e.date===today?'Hoje':e.date===yesterday?'Ontem':d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
@@ -4021,8 +4154,7 @@ function updateInstallmentPreview() {
 // QUICK CATEGORIES (top 3 this month)
 // ════════════════════════════════════════════
 function renderQuickCats() {
-  const prefix = getViewMonthPrefix();
-  const monthExp = expenses.filter(e => e.date.startsWith(prefix));
+  const monthExp = filterExpensesInView(expenses);
   const counts = {};
   monthExp.forEach(e => { counts[e.category] = (counts[e.category]||0) + 1; });
   const top3 = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id]) => id);
@@ -4240,8 +4372,7 @@ function updateSavingsGoal() {
   if (!card) return;
   if (savingsGoal <= 0) { card.style.display = 'none'; return; }
 
-  const prefix = getViewMonthPrefix();
-  const totalSpent = expenses.filter(e => e.date.startsWith(prefix)).reduce((s,e) => s+e.amount, 0);
+  const totalSpent = filterExpensesInView(expenses).reduce((s,e) => s+e.amount, 0);
   const totalBudget = Object.values(categoryBudgets).reduce((s,v) => s+v, 0) || budget;
   const canSpend = totalBudget > 0 ? totalBudget - savingsGoal : 0;
   const remaining = canSpend - totalSpent;
@@ -4433,8 +4564,7 @@ function openFilterModal() {
   var tlBtn = document.getElementById('fsort-view-timeline');
   if (listBtn) listBtn.className = 'filter-option' + (currentExpenseView==='list' ? ' sel' : '');
   if (tlBtn) tlBtn.className = 'filter-option' + (currentExpenseView==='timeline' ? ' sel' : '');
-  var prefix = getViewMonthPrefix();
-  var monthExp = expenses.filter(function(e) { return e.date.startsWith(prefix); });
+  var monthExp = filterExpensesInView(expenses);
   var cats = {};
   monthExp.forEach(function(e) {
     if (!cats[e.categoryLabel]) cats[e.categoryLabel] = e.categoryIcon || '';
@@ -4551,12 +4681,14 @@ function confirmDeleteInst(mode) {
 
 // ════ USER SELECT SUMMARY ════
 function updateUserSelectSummary() {
-  var prefix = getViewMonthPrefix();
+  var range = getViewDateRange();
   var vm = getViewMonth();
   var mnames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  var label = mnames[vm.month-1] + '/' + vm.year;
+  var label = viewMode === 'fatura'
+    ? (range.start.split('-')[2] + '/' + range.start.split('-')[1] + '–' + range.end.split('-')[2] + '/' + range.end.split('-')[1])
+    : mnames[vm.month-1] + '/' + vm.year;
   ['Welinton','D\u00E9bora'].forEach(function(name) {
-    var userExp = expenses.filter(function(e) { return e.date.startsWith(prefix) && e.person === name; });
+    var userExp = expenses.filter(function(e) { return e.date >= range.start && e.date <= range.end && e.person === name; });
     var total = userExp.reduce(function(s,e) { return s+e.amount; }, 0);
     var id = name === 'Welinton' ? 'W' : 'D';
     var el = document.getElementById('userStats' + id);
@@ -4641,7 +4773,7 @@ function exportAllData() {
   var content = bom + lines.join('\n');
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([content], {type:'text/csv;charset=utf-8'}));
-  a.download = 'gastos_familia_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.download = 'gastos_familia_' + localDateStr() + '.csv';
   a.click();
   showToast('Exportados: ' + sorted.length + ' gastos');
 }
@@ -4652,8 +4784,7 @@ var qlOpen = false;
 
 function toggleQuickLaunch() {
   if (qlOpen) { closeQuickLaunch(); return; }
-  var prefix = getViewMonthPrefix();
-  var monthExp = expenses.filter(function(e) { return e.date.startsWith(prefix); });
+  var monthExp = filterExpensesInView(expenses);
   var counts = {};
   monthExp.forEach(function(e) { counts[e.category] = (counts[e.category]||0)+1; });
   var top3 = Object.entries(counts).sort(function(a,b){return b[1]-a[1];}).slice(0,3).map(function(x){return x[0];});
@@ -4709,7 +4840,7 @@ function saveTrash() {
   // Manter apenas os últimos 30 dias
   var cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 30);
-  var cutStr = cutoff.toISOString().split('T')[0];
+  var cutStr = localDateStr(cutoff);
   deletedExpenses = deletedExpenses.filter(function(e) { return (e.deletedAt||'') >= cutStr; });
   localStorage.setItem('fin_trash', JSON.stringify(deletedExpenses));
   updateTrashCount();
@@ -4717,7 +4848,7 @@ function saveTrash() {
 
 function addToTrash(expense) {
   var copy = JSON.parse(JSON.stringify(expense));
-  copy.deletedAt = new Date().toISOString().split('T')[0];
+  copy.deletedAt = localDateStr();
   deletedExpenses.unshift(copy);
   saveTrash();
 }
