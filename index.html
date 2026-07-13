@@ -777,6 +777,7 @@
           <span style="font-size:10px;color:var(--text-hint)">▼</span>
         </button>
           <button onclick="openCalendarModal()" title="Ver calendario" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:16px;flex-shrink:0">&#128197;</button>
+          <button id="editCycleBtn" onclick="openCycleEditModal()" title="Ajustar datas deste ciclo" style="display:none;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:14px;flex-shrink:0">&#9999;&#65039;</button>
         </div>
         <button class="current-user-badge w" id="currentUserBadge" onclick="showUserSelect()" title="Trocar usuario">
           <span id="currentUserIcon">W</span>
@@ -1406,6 +1407,25 @@
         <label class="form-label">Ou escolha um mês específico</label>
         <input type="month" class="text-input" id="monthPickerInput" onchange="applyMonthPicker()" />
       </div>
+    </div>
+  </div>
+
+  <!-- Cycle Edit Modal (fatura) -->
+  <div class="modal-overlay" id="cycleEditModal" onclick="if(event.target===this)closeCycleEditModal()">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">✏️ Ajustar datas deste ciclo</div>
+      <p style="font-size:12px;color:var(--text-hint);margin-top:-8px;margin-bottom:16px">Use quando a fatura fechar antes ou depois do dia de vencimento padrão — por exemplo, por causa de feriado ou fim de semana. O ajuste vale só para este ciclo.</p>
+      <div class="form-group">
+        <label class="form-label">Abertura do ciclo</label>
+        <input type="date" class="text-input" id="cycleStartInput" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fechamento do ciclo</label>
+        <input type="date" class="text-input" id="cycleEndInput" />
+      </div>
+      <button class="btn-primary" onclick="saveCycleEdit()">Salvar datas deste ciclo</button>
+      <button class="btn-secondary" id="cycleResetBtn" onclick="resetCycleEdit()" style="display:none;margin-top:8px;margin-bottom:0">↩️ Voltar ao cálculo automático</button>
     </div>
   </div>
 
@@ -2091,29 +2111,97 @@ let viewMode = localStorage.getItem('fin_view_mode') || 'calendar'; // 'calendar
 let faturaDueDay = parseInt(localStorage.getItem('fin_fatura_day') || '28', 10);
 if (isNaN(faturaDueDay) || faturaDueDay < 1 || faturaDueDay > 31) faturaDueDay = 28;
 
-// Calcula o intervalo [início, fim] do ciclo de fatura para um dado offset.
-// Ex: vencimento dia 28 → ciclo vai de 29 do mês anterior até 28 do mês atual.
-// Usa objetos Date (não aritmética manual de mês/ano) para que a virada de
-// ano e meses com menos dias sejam normalizados automaticamente pelo motor
-// JS, evitando a classe de bug que já corrigimos no fuso horário.
-function getFaturaCycleRange(offset) {
+// Ajustes manuais por ciclo (fatura antecipa/posterga em alguns meses por
+// causa de feriado/fim de semana). Chave = "YYYY-MM" do mês de FECHAMENTO
+// do ciclo — assim o ajuste é fixo àquele ciclo específico, e não ao offset
+// de navegação (que muda de significado conforme os dias passam).
+let faturaOverrides = {};
+try { faturaOverrides = JSON.parse(localStorage.getItem('fin_fatura_overrides') || '{}'); }
+catch(e) { faturaOverrides = {}; }
+
+// Determina o ano/mês (normalizados) em que o ciclo de um dado offset fecha.
+// Isolado do cálculo de datas para que a mesma chave sirva tanto para achar
+// um ajuste manual quanto para o cálculo automático de fallback.
+function getFaturaCloseYM(offset) {
   const now = new Date();
-  const y = now.getFullYear();
   let closeMonth = now.getMonth(); // 0-indexed
-  // Se já passamos do dia de vencimento este mês, o ciclo "aberto agora"
-  // fecha no PRÓXIMO mês.
   if (now.getDate() > faturaDueDay) closeMonth += 1;
   closeMonth += offset;
+  // new Date(y, m, 1) normaliza meses fora de 0-11 automaticamente,
+  // inclusive virada de ano — mesmo princípio usado na correção do fuso.
+  const normalized = new Date(now.getFullYear(), closeMonth, 1);
+  return { y: normalized.getFullYear(), m: normalized.getMonth() };
+}
 
-  const daysInCloseMonth = new Date(y, closeMonth + 1, 0).getDate();
+function faturaCycleKey(offset) {
+  const { y, m } = getFaturaCloseYM(offset);
+  return y + '-' + String(m + 1).padStart(2, '0');
+}
+
+// Calcula o intervalo [início, fim] do ciclo de fatura para um dado offset.
+// Se houver um ajuste manual salvo para este ciclo específico, ele tem
+// prioridade; caso contrário, cai no cálculo automático a partir do dia de
+// vencimento (ex: vencimento dia 28 → ciclo vai de 29 do mês anterior até
+// 28 do mês atual).
+function getFaturaCycleRange(offset) {
+  const key = faturaCycleKey(offset);
+  const override = faturaOverrides[key];
+  if (override && override.start && override.end) return { start: override.start, end: override.end };
+
+  const { y, m } = getFaturaCloseYM(offset);
+  const daysInCloseMonth = new Date(y, m + 1, 0).getDate();
   const closeDay = Math.min(faturaDueDay, daysInCloseMonth);
-  const endDateObj = new Date(y, closeMonth, closeDay);
+  const endDateObj = new Date(y, m, closeDay);
 
-  const prevDaysInMonth = new Date(y, closeMonth, 0).getDate();
+  const prevDaysInMonth = new Date(y, m, 0).getDate();
   const prevCloseDay = Math.min(faturaDueDay, prevDaysInMonth);
-  const startDateObj = new Date(y, closeMonth - 1, prevCloseDay + 1);
+  const startDateObj = new Date(y, m - 1, prevCloseDay + 1);
 
   return { start: localDateStr(startDateObj), end: localDateStr(endDateObj) };
+}
+
+// ── Modal de ajuste manual do ciclo ──
+function openCycleEditModal() {
+  if (viewMode !== 'fatura') return;
+  const range = getFaturaCycleRange(currentMonthOffset);
+  const key = faturaCycleKey(currentMonthOffset);
+  document.getElementById('cycleStartInput').value = range.start;
+  document.getElementById('cycleEndInput').value = range.end;
+  const resetBtn = document.getElementById('cycleResetBtn');
+  if (resetBtn) resetBtn.style.display = faturaOverrides[key] ? 'block' : 'none';
+  document.getElementById('cycleEditModal').classList.add('open');
+}
+function closeCycleEditModal() {
+  document.getElementById('cycleEditModal').classList.remove('open');
+}
+function saveCycleEdit() {
+  const start = document.getElementById('cycleStartInput').value;
+  const end = document.getElementById('cycleEndInput').value;
+  if (!start || !end) { showToast('⚠️ Preencha as duas datas'); return; }
+  if (start > end) { showToast('⚠️ A abertura precisa ser antes do fechamento'); return; }
+  const key = faturaCycleKey(currentMonthOffset);
+  faturaOverrides[key] = { start, end };
+  localStorage.setItem('fin_fatura_overrides', JSON.stringify(faturaOverrides));
+  closeCycleEditModal();
+  refreshAfterCycleChange();
+  showToast('✅ Datas do ciclo salvas');
+}
+function resetCycleEdit() {
+  const key = faturaCycleKey(currentMonthOffset);
+  delete faturaOverrides[key];
+  localStorage.setItem('fin_fatura_overrides', JSON.stringify(faturaOverrides));
+  closeCycleEditModal();
+  refreshAfterCycleChange();
+  showToast('↩️ Ciclo voltou ao cálculo automático');
+}
+function refreshAfterCycleChange() {
+  updateMonthLabel();
+  updateHeader();
+  renderExpenses();
+  if (document.getElementById('screen-stats') && document.getElementById('screen-stats').classList.contains('active')) {
+    renderStats();
+    if (typeof renderMonthlyChart === 'function') renderMonthlyChart();
+  }
 }
 
 // Fonte única do intervalo de datas "em exibição" — respeita o modo ativo.
@@ -2125,6 +2213,7 @@ function getViewDateRange() {
   const end = `${year}-${String(month).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`;
   return { start, end };
 }
+
 
 // Filtro central: substitui o antigo `e.date.startsWith(prefix)` em todas as
 // telas que mostram "o período atual" (lista, header, stats, categorias,
@@ -2138,13 +2227,7 @@ function setViewModePref(mode) {
   viewMode = mode;
   localStorage.setItem('fin_view_mode', mode);
   updateViewModeUI();
-  updateMonthLabel();
-  updateHeader();
-  renderExpenses();
-  if (document.getElementById('screen-stats') && document.getElementById('screen-stats').classList.contains('active')) {
-    renderStats();
-    if (typeof renderMonthlyChart === 'function') renderMonthlyChart();
-  }
+  refreshAfterCycleChange();
   showToast(mode === 'fatura' ? '💳 Exibindo por ciclo de fatura' : '📅 Exibindo por mês calendário');
 }
 
@@ -2157,6 +2240,8 @@ function updateViewModeUI() {
   if (row) row.style.display = viewMode === 'fatura' ? 'block' : 'none';
   const inp = document.getElementById('faturaDayInput');
   if (inp && document.activeElement !== inp) inp.value = faturaDueDay;
+  const editBtn = document.getElementById('editCycleBtn');
+  if (editBtn) editBtn.style.display = viewMode === 'fatura' ? 'inline-flex' : 'none';
 }
 
 function saveFaturaDay() {
@@ -2165,13 +2250,7 @@ function saveFaturaDay() {
   if (!val || val < 1 || val > 31) { showToast('⚠️ Informe um dia entre 1 e 31'); return; }
   faturaDueDay = val;
   localStorage.setItem('fin_fatura_day', String(val));
-  updateMonthLabel();
-  updateHeader();
-  renderExpenses();
-  if (document.getElementById('screen-stats') && document.getElementById('screen-stats').classList.contains('active')) {
-    renderStats();
-    if (typeof renderMonthlyChart === 'function') renderMonthlyChart();
-  }
+  refreshAfterCycleChange();
   showToast('💳 Dia de vencimento salvo: ' + val);
 }
 
@@ -2191,8 +2270,9 @@ function updateMonthLabel() {
   const pickerLabel = document.getElementById('monthPickerLabel');
   if (viewMode === 'fatura') {
     const { start, end } = getFaturaCycleRange(currentMonthOffset);
+    const isOverridden = !!faturaOverrides[faturaCycleKey(currentMonthOffset)];
     const shortDM = (s) => { const p = s.split('-'); return p[2] + '/' + p[1]; };
-    const label = `💳 ${shortDM(start)}–${shortDM(end)}`;
+    const label = `💳 ${shortDM(start)}–${shortDM(end)}${isOverridden ? ' ✏️' : ''}`;
     if (el) el.textContent = label;
     if (pickerLabel) pickerLabel.textContent = currentMonthOffset > 0 ? `${label} 📅` : label;
     return;
