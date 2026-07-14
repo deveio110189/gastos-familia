@@ -2717,18 +2717,19 @@ function startVoiceEntry() {
 // por voz quando o app é lançado via "?action=voice" (pressionar e segurar
 // o ícone na tela inicial). Espera a seleção de usuário terminar antes de
 // abrir o modal, para não competir com aquela tela.
-function checkVoiceShortcut() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('action') !== 'voice') return;
-
-  // Limpa a URL para não repetir isso se a página recarregar depois
-  history.replaceState({}, '', window.location.pathname);
+let voiceShortcutLastHandled = 0;
+function handleVoiceShortcutLaunch() {
+  // Numa navegação nova, tanto o carregamento normal quanto o evento do
+  // launchQueue podem disparar isso — essa trava evita abrir o modal (e o
+  // microfone) duas vezes seguidas.
+  const now = Date.now();
+  if (now - voiceShortcutLastHandled < 3000) return;
+  voiceShortcutLastHandled = now;
 
   const launch = () => {
     openAddModal();
     setTimeout(() => { startVoiceEntry(); }, 500);
   };
-
   const userScreen = document.getElementById('userSelectScreen');
   if (userScreen && userScreen.style.display !== 'none') {
     const waitUserPick = setInterval(() => {
@@ -2740,6 +2741,33 @@ function checkVoiceShortcut() {
   } else {
     launch();
   }
+}
+
+// Caminho 1: app abriu do zero (navegação nova) com "?action=voice" na URL.
+function checkVoiceShortcut() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('action') !== 'voice') return;
+  // Limpa a URL para não repetir isso se a página recarregar depois
+  history.replaceState({}, '', window.location.pathname);
+  handleVoiceShortcutLaunch();
+}
+
+// Caminho 2: o app JÁ estava aberto (minimizado) e o Android só trouxe a
+// janela existente pra frente, sem recarregar a página — nesse caso o
+// "?action=voice" na URL nunca chega a ser lido pelo checkVoiceShortcut()
+// acima. A Launch Handler API avisa a página diretamente quando isso
+// acontece, independente de haver navegação real ou não. Registrado no
+// nível principal do script para pegar o evento o quanto antes.
+if ('launchQueue' in window) {
+  window.launchQueue.setConsumer((launchParams) => {
+    if (!launchParams || !launchParams.targetURL) return;
+    try {
+      const url = new URL(launchParams.targetURL);
+      if (url.searchParams.get('action') === 'voice') {
+        handleVoiceShortcutLaunch();
+      }
+    } catch (e) { /* URL inválida — ignora */ }
+  });
 }
 
 // ── Modal ──
