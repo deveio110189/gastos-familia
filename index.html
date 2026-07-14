@@ -837,6 +837,7 @@
 
     <!-- Stats -->
     <div class="screen" id="screen-stats">
+      <button class="btn-secondary" style="margin-bottom:14px" onclick="openMonthSummary(-1)">📊 Ver resumo do período anterior</button>
       <div class="stats-row">
         <div class="stat-card"><div class="stat-label">Total mês</div><div class="stat-value red" id="statTotal">R$ 0</div></div>
         <div class="stat-card"><div class="stat-label">Lançamentos</div><div class="stat-value blue" id="statCount">0</div></div>
@@ -1421,6 +1422,16 @@
     </div>
   </div>
 
+  <!-- Month/Cycle Summary Modal -->
+  <div class="modal-overlay" id="monthSummaryModal" onclick="if(event.target===this)closeMonthSummary()">
+    <div class="modal-sheet" style="max-height:85dvh">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="monthSummaryTitle">📊 Resumo do período</div>
+      <div id="monthSummaryBody"></div>
+      <button class="btn-primary" onclick="closeMonthSummary()">Fechar</button>
+    </div>
+  </div>
+
   <!-- Trash Modal -->
   <div class="modal-overlay" id="trashModal" onclick="if(event.target===this)closeTrashModal()">
     <div class="modal-sheet" style="max-height:75dvh">
@@ -1567,6 +1578,10 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-title" id="modalTitle">Novo gasto</div>
+
+      <button id="voiceEntryBtn" onclick="startVoiceEntry()" style="display:none;width:100%;margin-bottom:16px;padding:12px;border-radius:12px;border:1.5px dashed var(--border-strong);background:var(--surface-raised);color:var(--text);font-family:var(--font);font-weight:600;font-size:13px;cursor:pointer;align-items:center;justify-content:center;gap:8px">
+        🎤 Lançar por voz
+      </button>
 
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;background:var(--surface-raised);border-radius:var(--radius-sm);border:1px solid var(--border)">
         <div id="modalUserAvatar" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;background:var(--blue-50);color:var(--blue-700)">W</div>
@@ -1993,6 +2008,22 @@ function init() {
   }
   loadSavingsGoal();
   currentYear = new Date().getFullYear();
+
+  // Resumo automático do período fechado — só depois da tela de seleção de
+  // usuário ter sumido, e só uma vez por período (controlado via localStorage).
+  setTimeout(() => {
+    const userScreen = document.getElementById('userSelectScreen');
+    if (userScreen && userScreen.style.display !== 'none') {
+      const waitUserPick = setInterval(() => {
+        if (userScreen.style.display === 'none') {
+          clearInterval(waitUserPick);
+          maybeAutoShowMonthSummary();
+        }
+      }, 500);
+    } else {
+      maybeAutoShowMonthSummary();
+    }
+  }, 1200);
 }
 
 function loadFromStorage() {
@@ -2216,6 +2247,151 @@ function filterExpensesInView(exps) {
   return exps.filter(e => e.date >= start && e.date <= end);
 }
 
+// ── Resumo automático no fechamento do período ──
+// Calcula o intervalo de um período "offset" (relativo a HOJE, não à
+// navegação atual) — independente do calendário estar sendo navegado.
+// Ex: offset -1 = o período (mês ou fatura) que acabou de fechar.
+function getCalendarRangeForOffset(offset) {
+  const d = new Date();
+  d.setMonth(d.getMonth() + offset);
+  const year = d.getFullYear(), month = d.getMonth() + 1;
+  const start = `${year}-${String(month).padStart(2,'0')}-01`;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const end = `${year}-${String(month).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`;
+  return { start, end };
+}
+function getPeriodRangeForOffset(offset) {
+  return viewMode === 'fatura' ? getFaturaCycleRange(offset) : getCalendarRangeForOffset(offset);
+}
+// Chave estável do período (para lembrar "já mostrei o resumo deste período").
+function getPeriodKeyForOffset(offset) {
+  if (viewMode === 'fatura') return 'fat-' + faturaCycleKey(offset);
+  const d = new Date(); d.setMonth(d.getMonth() + offset);
+  return 'cal-' + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function periodLabelForOffset(offset) {
+  const { start, end } = getPeriodRangeForOffset(offset);
+  if (viewMode === 'fatura') {
+    const short = (s) => { const p = s.split('-'); return p[2] + '/' + p[1]; };
+    return `Fatura ${short(start)}–${short(end)}`;
+  }
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const p = start.split('-');
+  return `${months[parseInt(p[1],10)-1]}/${p[0]}`;
+}
+
+// Monta os destaques do período: total, quem gastou mais, categoria que mais
+// pesou, categoria que mais cresceu/caiu vs período anterior, dia de maior gasto.
+function computePeriodSummary(offset) {
+  const range = getPeriodRangeForOffset(offset);
+  const prevRange = getPeriodRangeForOffset(offset - 1);
+  const exps = expenses.filter(e => !e.isPendingValue && e.date >= range.start && e.date <= range.end);
+  const prevExps = expenses.filter(e => !e.isPendingValue && e.date >= prevRange.start && e.date <= prevRange.end);
+
+  const total = exps.reduce((s,e) => s+e.amount, 0);
+  const wTotal = exps.filter(e => e.person === 'Welinton').reduce((s,e) => s+e.amount, 0);
+  const dTotal = exps.filter(e => e.person === 'Débora').reduce((s,e) => s+e.amount, 0);
+
+  const catTotals = {};
+  exps.forEach(e => { const k = e.categoryLabel || 'Outros'; catTotals[k] = (catTotals[k]||0) + e.amount; });
+  const prevCatTotals = {};
+  prevExps.forEach(e => { const k = e.categoryLabel || 'Outros'; prevCatTotals[k] = (prevCatTotals[k]||0) + e.amount; });
+
+  let topCat = null, topCatVal = 0;
+  Object.keys(catTotals).forEach(c => { if (catTotals[c] > topCatVal) { topCatVal = catTotals[c]; topCat = c; } });
+
+  let topGrowth = null, topGrowthDiff = 0;
+  let topDrop = null, topDropDiff = 0;
+  const allCatKeys = new Set([...Object.keys(catTotals), ...Object.keys(prevCatTotals)]);
+  allCatKeys.forEach(c => {
+    const diff = (catTotals[c]||0) - (prevCatTotals[c]||0);
+    if (diff > topGrowthDiff) { topGrowthDiff = diff; topGrowth = c; }
+    if (diff < topDropDiff) { topDropDiff = diff; topDrop = c; }
+  });
+
+  const dayTotals = {};
+  exps.forEach(e => { dayTotals[e.date] = (dayTotals[e.date]||0) + e.amount; });
+  let topDay = null, topDayVal = 0;
+  Object.keys(dayTotals).forEach(d => { if (dayTotals[d] > topDayVal) { topDayVal = dayTotals[d]; topDay = d; } });
+
+  return {
+    range, total, wTotal, dTotal, count: exps.length,
+    topCat, topCatVal,
+    topGrowth, topGrowthDiff,
+    topDrop, topDropDiff: Math.abs(topDropDiff),
+    topDay, topDayVal
+  };
+}
+
+function renderMonthSummary(offset) {
+  const s = computePeriodSummary(offset);
+  document.getElementById('monthSummaryTitle').textContent = '📊 Resumo — ' + periodLabelForOffset(offset);
+  const body = document.getElementById('monthSummaryBody');
+
+  if (s.count === 0) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">🌱</div><div class="empty-title">Sem gastos</div><div class="empty-desc">Não houve lançamentos neste período.</div></div>';
+    return;
+  }
+
+  const whoMore = s.wTotal >= s.dTotal ? 'Welinton' : 'Débora';
+  const whoMoreVal = Math.max(s.wTotal, s.dTotal);
+  const dayLabel = s.topDay ? (() => { const d = new Date(s.topDay+'T12:00:00'); return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}); })() : '';
+
+  let html = '';
+  html += '<div style="text-align:center;padding:16px 0;background:var(--surface-raised);border-radius:14px;margin-bottom:14px">'
+    + '<div style="font-size:11px;color:var(--text-hint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Total do período</div>'
+    + '<div style="font-size:28px;font-weight:800">' + fmtCurrency(s.total) + '</div>'
+    + '<div style="font-size:12px;color:var(--text-hint);margin-top:4px">' + s.count + ' lançamento(s)</div>'
+    + '</div>';
+
+  html += '<div style="display:flex;flex-direction:column;gap:10px">';
+
+  html += '<div class="budget-alert" style="background:var(--surface-raised);color:var(--text)">'
+    + '<span style="font-size:18px">👤</span><span><b>' + whoMore + '</b> gastou mais este período: ' + fmtCurrency(whoMoreVal) + '</span></div>';
+
+  if (s.topCat) {
+    html += '<div class="budget-alert" style="background:var(--surface-raised);color:var(--text)">'
+      + '<span style="font-size:18px">🏷️</span><span>Categoria que mais pesou: <b>' + s.topCat + '</b> (' + fmtCurrency(s.topCatVal) + ')</span></div>';
+  }
+  if (s.topGrowth) {
+    html += '<div class="budget-alert warn">'
+      + '<span style="font-size:18px">📈</span><span><b>' + s.topGrowth + '</b> subiu ' + fmtCurrency(s.topGrowthDiff) + ' em relação ao período anterior</span></div>';
+  }
+  if (s.topDrop) {
+    html += '<div class="budget-alert" style="background:var(--green-50);color:var(--green-700)">'
+      + '<span style="font-size:18px">📉</span><span><b>' + s.topDrop + '</b> caiu ' + fmtCurrency(s.topDropDiff) + ' em relação ao período anterior</span></div>';
+  }
+  if (s.topDay) {
+    html += '<div class="budget-alert" style="background:var(--surface-raised);color:var(--text)">'
+      + '<span style="font-size:18px">📅</span><span>Dia de maior gasto: <b>' + dayLabel + '</b> (' + fmtCurrency(s.topDayVal) + ')</span></div>';
+  }
+
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function openMonthSummary(offset) {
+  renderMonthSummary(offset);
+  document.getElementById('monthSummaryModal').classList.add('open');
+}
+function closeMonthSummary() {
+  document.getElementById('monthSummaryModal').classList.remove('open');
+}
+
+// Mostra o resumo automaticamente UMA vez, na primeira abertura do app após
+// o período anterior ter fechado — sem interromper aberturas seguintes.
+function maybeAutoShowMonthSummary() {
+  try {
+    const key = getPeriodKeyForOffset(-1);
+    const flagKey = 'fin_summary_shown_' + key;
+    if (localStorage.getItem(flagKey)) return;
+    localStorage.setItem(flagKey, '1');
+    const s = computePeriodSummary(-1);
+    if (s.count === 0) return;
+    openMonthSummary(-1);
+  } catch (e) { /* nunca deixa isso quebrar o carregamento do app */ }
+}
+
 function setViewModePref(mode) {
   viewMode = mode;
   localStorage.setItem('fin_view_mode', mode);
@@ -2355,11 +2531,193 @@ function setDefaultDate() {
   document.getElementById('dateInput').value = localDateStr();
 }
 
+// ── Lançamento por voz ──
+// Sinônimos por categoria: usados para reconhecer o que foi falado mesmo
+// quando a pessoa não diz o nome exato da categoria (ex: "uber" → Transporte).
+const VOICE_CATEGORY_SYNONYMS = {
+  mercado:     ['mercado', 'supermercado', 'feira', 'hortifruti', 'sacolao'],
+  alimentacao: ['alimentacao', 'restaurante', 'lanche', 'lanchonete', 'ifood', 'comida', 'padaria', 'cafe', 'almoco', 'jantar', 'pizza', 'delivery'],
+  transporte:  ['transporte', 'uber', '99', 'gasolina', 'combustivel', 'posto', 'onibus', 'estacionamento', 'taxi', 'pedagio'],
+  saude:       ['saude', 'farmacia', 'remedio', 'medico', 'consulta', 'exame', 'dentista'],
+  moradia:     ['moradia', 'aluguel', 'condominio', 'luz', 'energia', 'agua', 'internet', 'gas', 'iptu'],
+  educacao:    ['educacao', 'curso', 'escola', 'faculdade', 'livro', 'mensalidade'],
+  lazer:       ['lazer', 'cinema', 'show', 'viagem', 'passeio', 'bar', 'balada', 'festa'],
+  vestuario:   ['vestuario', 'roupa', 'sapato', 'tenis', 'loja', 'calcado'],
+  assinaturas: ['assinatura', 'assinaturas', 'netflix', 'spotify', 'amazon', 'streaming', 'prime'],
+  pets:        ['pet', 'pets', 'veterinario', 'racao', 'petshop'],
+  presentes:   ['presente', 'presentes', 'aniversario'],
+};
+
+// Converte números por extenso em português (0 a milhares) para inteiro.
+// Cobre o vocabulário comum de compras do dia a dia — não tenta cobrir
+// valores muito grandes ou formas raras de falar números. Retorna também
+// os índices das palavras consumidas, para permitir remover exatamente
+// esse trecho da descrição depois (sem "sobras" tipo "cinquenta reais de").
+function wordsToNumberPT(normText) {
+  const units = {zero:0,um:1,uma:1,dois:2,duas:2,tres:3,quatro:4,cinco:5,seis:6,sete:7,oito:8,nove:9};
+  const teens = {dez:10,onze:11,doze:12,treze:13,catorze:14,quatorze:14,quinze:15,dezesseis:16,dezessete:17,dezoito:18,dezenove:19};
+  const tens = {vinte:20,trinta:30,quarenta:40,cinquenta:50,sessenta:60,setenta:70,oitenta:80,noventa:90};
+  const hundreds = {cem:100,cento:100,duzentos:200,trezentos:300,quatrocentos:400,quinhentos:500,seiscentos:600,setecentos:700,oitocentos:800,novecentos:900};
+  const words = normText.split(/\s+/);
+  const isNumWord = (w) => w === 'mil' || units[w] !== undefined || teens[w] !== undefined || tens[w] !== undefined || hundreds[w] !== undefined;
+  let startIdx = -1;
+  for (let i = 0; i < words.length; i++) { if (isNumWord(words[i])) { startIdx = i; break; } }
+  if (startIdx === -1) return null;
+  let total = 0, current = 0, endIdx = startIdx;
+  for (let i = startIdx; i < words.length; i++) {
+    const w = words[i];
+    if (w === 'mil') { current = current === 0 ? 1000 : current * 1000; total += current; current = 0; endIdx = i; continue; }
+    if (hundreds[w] !== undefined) { current += hundreds[w]; endIdx = i; continue; }
+    if (tens[w] !== undefined) { current += tens[w]; endIdx = i; continue; }
+    if (teens[w] !== undefined) { current += teens[w]; endIdx = i; continue; }
+    if (units[w] !== undefined) { current += units[w]; endIdx = i; continue; }
+    // "e" só é conector se ligar duas palavras numéricas (ex: "cinquenta e cinco")
+    if (w === 'e' && i + 1 < words.length && isNumWord(words[i+1])) continue;
+    break;
+  }
+  total += current;
+  return { value: total, startIdx, endIdx };
+}
+
+function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+// Extrai o valor em reais de um texto falado, tentando primeiro dígitos
+// (mais confiável) e só recorrendo a números por extenso como fallback.
+// Retorna também `matchText` — o trecho EXATO do texto original que
+// corresponde ao valor, usado depois para limpar a descrição.
+function parseVoiceAmount(rawText) {
+  const norm = normStr(rawText);
+
+  let m = norm.match(/(\d+)[.,](\d{2})\b/);
+  if (m) return { value: parseFloat(m[1] + '.' + m[2]), matchText: m[0] };
+
+  m = norm.match(/(\d+)\s*reais?\s*(?:e\s*(\d+)\s*centavos?)?/);
+  if (m) return { value: parseInt(m[1], 10) + (m[2] ? parseInt(m[2], 10) / 100 : 0), matchText: m[0] };
+
+  m = norm.match(/\b(\d+)\b/);
+  if (m) return { value: parseFloat(m[1]), matchText: m[0] };
+
+  const wr = wordsToNumberPT(norm);
+  if (wr) {
+    let value = wr.value;
+    let endIdx = wr.endIdx;
+    const normWords = norm.split(/\s+/);
+    // inclui "reais"/"real" logo após o número falado, se houver
+    if (normWords[endIdx+1] === 'reais' || normWords[endIdx+1] === 'real') endIdx++;
+    // inclui "e X centavos" logo após, se houver
+    if (normWords[endIdx+1] === 'e' && /^\d+$/.test(normWords[endIdx+2]||'') && /centavos?/.test(normWords[endIdx+3]||'')) {
+      value += parseInt(normWords[endIdx+2], 10) / 100;
+      endIdx += 3;
+    }
+    const rawWords = rawText.split(/\s+/);
+    const matchText = rawWords.slice(wr.startIdx, endIdx + 1).join(' ');
+    return { value, matchText };
+  }
+  return null;
+}
+
+// Identifica a categoria comparando com os rótulos oficiais e os sinônimos.
+function parseVoiceCategory(normText) {
+  const allCats = getAllCategories();
+  for (const cat of allCats) {
+    if (normText.indexOf(normStr(cat.label)) !== -1) return cat.id;
+  }
+  for (const catId in VOICE_CATEGORY_SYNONYMS) {
+    const synonyms = VOICE_CATEGORY_SYNONYMS[catId];
+    for (const syn of synonyms) {
+      if (new RegExp('\\b' + syn + '\\b').test(normText)) {
+        // só usa se essa categoria existir de fato (padrão ou personalizada)
+        if (allCats.some(c => c.id === catId)) return catId;
+      }
+    }
+  }
+  return null;
+}
+
+// Remove da descrição as palavras que já foram usadas para identificar a
+// categoria (comparação sem acento, palavra por palavra — assim "farmácia"
+// falado é removido mesmo o sinônimo estando cadastrado sem acento).
+function stripCategoryWordsFromDesc(desc, category) {
+  if (!category) return desc;
+  const cat = getAllCategories().find(c => c.id === category);
+  const dropSet = new Set(VOICE_CATEGORY_SYNONYMS[category] || []);
+  if (cat) normStr(cat.label).split(/\s+/).forEach(w => dropSet.add(w));
+  return desc.split(/\s+/).filter(w => w && !dropSet.has(normStr(w))).join(' ').trim();
+}
+
+// Junta tudo: valor, categoria e o que sobrar vira a descrição.
+function parseVoiceExpense(rawText) {
+  const norm = normStr(rawText);
+  const amountResult = parseVoiceAmount(rawText);
+  const category = parseVoiceCategory(norm);
+
+  let desc = rawText;
+  if (amountResult && amountResult.matchText) {
+    desc = desc.replace(new RegExp(escapeRegex(amountResult.matchText), 'i'), '').trim();
+  }
+  desc = desc.replace(/r\$\s*/gi, '').trim();
+  desc = stripCategoryWordsFromDesc(desc, category);
+  desc = desc.replace(/^\s*de\b\s*/i, '').replace(/\bde\s*$/i, '').trim();
+  desc = desc.replace(/\s{2,}/g, ' ').trim();
+
+  return { amount: amountResult ? amountResult.value : null, category, description: desc };
+}
+
+function applyVoiceExpense(transcript) {
+  const parsed = parseVoiceExpense(transcript);
+  if (parsed.amount) {
+    document.getElementById('amountInput').value = parsed.amount.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  if (parsed.category) selectCategory(parsed.category);
+  if (parsed.description) document.getElementById('descInput').value = parsed.description;
+  if (!parsed.amount && !parsed.category) {
+    showToast('🎤 Não consegui identificar valor/categoria — preencha manualmente');
+  } else {
+    showToast('🎤 Ouvi: "' + transcript + '" — confira e salve');
+  }
+}
+
+function startVoiceEntry() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showToast('🎤 Reconhecimento de voz não disponível neste navegador'); return; }
+  const btn = document.getElementById('voiceEntryBtn');
+  const recognition = new SR();
+  recognition.lang = 'pt-BR';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  if (btn) { btn.disabled = true; btn.textContent = '🎤 Ouvindo...'; }
+
+  recognition.onresult = function(event) {
+    const transcript = event.results[0][0].transcript;
+    applyVoiceExpense(transcript);
+  };
+  recognition.onerror = function() {
+    showToast('🎤 Não entendi. Tente novamente.');
+  };
+  recognition.onend = function() {
+    if (btn) { btn.disabled = false; btn.textContent = '🎤 Lançar por voz'; }
+  };
+
+  try {
+    recognition.start();
+  } catch (e) {
+    showToast('🎤 Erro ao iniciar o microfone');
+    if (btn) { btn.disabled = false; btn.textContent = '🎤 Lançar por voz'; }
+  }
+}
+
 // ── Modal ──
 function openAddModal(editId = null) {
   editingId = editId;
   document.getElementById('modalTitle').textContent = editId ? 'Editar gasto' : 'Novo gasto';
   document.getElementById('submitBtn').textContent = editId ? 'Salvar alterações' : 'Adicionar gasto';
+
+  const voiceBtn = document.getElementById('voiceEntryBtn');
+  if (voiceBtn) {
+    const hasSpeechApi = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    voiceBtn.style.display = (!editId && hasSpeechApi) ? 'flex' : 'none';
+  }
 
   if (editId) {
     const e = expenses.find(x => x.id === editId);
