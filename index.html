@@ -2009,19 +2009,25 @@ function init() {
   loadSavingsGoal();
   currentYear = new Date().getFullYear();
 
-  // Resumo automático do período fechado — só depois da tela de seleção de
-  // usuário ter sumido, e só uma vez por período (controlado via localStorage).
+  // Se o app foi aberto pelo atalho "Lançar por voz", isso tem prioridade
+  // sobre o resumo automático — não faz sentido competir com o modal de voz.
+  const isVoiceShortcut = new URLSearchParams(window.location.search).get('action') === 'voice';
+
   setTimeout(() => {
     const userScreen = document.getElementById('userSelectScreen');
+    const proceed = () => {
+      if (isVoiceShortcut) checkVoiceShortcut();
+      else maybeAutoShowMonthSummary();
+    };
     if (userScreen && userScreen.style.display !== 'none') {
       const waitUserPick = setInterval(() => {
         if (userScreen.style.display === 'none') {
           clearInterval(waitUserPick);
-          maybeAutoShowMonthSummary();
+          proceed();
         }
       }, 500);
     } else {
-      maybeAutoShowMonthSummary();
+      proceed();
     }
   }, 1200);
 }
@@ -2704,6 +2710,35 @@ function startVoiceEntry() {
   } catch (e) {
     showToast('🎤 Erro ao iniciar o microfone');
     if (btn) { btn.disabled = false; btn.textContent = '🎤 Lançar por voz'; }
+  }
+}
+
+// ── Atalho de app (manifest.json → shortcuts): abre direto no lançamento
+// por voz quando o app é lançado via "?action=voice" (pressionar e segurar
+// o ícone na tela inicial). Espera a seleção de usuário terminar antes de
+// abrir o modal, para não competir com aquela tela.
+function checkVoiceShortcut() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('action') !== 'voice') return;
+
+  // Limpa a URL para não repetir isso se a página recarregar depois
+  history.replaceState({}, '', window.location.pathname);
+
+  const launch = () => {
+    openAddModal();
+    setTimeout(() => { startVoiceEntry(); }, 500);
+  };
+
+  const userScreen = document.getElementById('userSelectScreen');
+  if (userScreen && userScreen.style.display !== 'none') {
+    const waitUserPick = setInterval(() => {
+      if (userScreen.style.display === 'none') {
+        clearInterval(waitUserPick);
+        launch();
+      }
+    }, 300);
+  } else {
+    launch();
   }
 }
 
