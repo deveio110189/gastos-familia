@@ -1138,6 +1138,7 @@
       <div class="config-section">
         <div class="config-section-title">Dados locais</div>
         <button class="btn-secondary" onclick="restoreHiddenCats()" style="margin-bottom:8px">🔄 Restaurar categorias excluídas</button>
+        <button class="btn-secondary" onclick="openDuplicatesModal()" style="margin-bottom:8px">🔍 Detectar gastos duplicados</button>
         <button class="btn-secondary" onclick="exportAllData()" style="margin-bottom:8px">⬇️ Exportar todos os dados (CSV)</button>
         <button class="btn-secondary" onclick="migrateInstallments()" style="margin-bottom:8px">💳 Reorganizar parcelas existentes</button>
         <button class="btn-secondary" onclick="openTrashModal()" style="margin-bottom:8px">🗑️ Lixeira <span id="trashCount" style="background:var(--red-500);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px">0</span></button>
@@ -1473,6 +1474,17 @@
       <div class="modal-title" id="monthSummaryTitle">📊 Resumo do período</div>
       <div id="monthSummaryBody"></div>
       <button class="btn-primary" onclick="closeMonthSummary()">Fechar</button>
+    </div>
+  </div>
+
+  <!-- Duplicates Modal -->
+  <div class="modal-overlay" id="duplicatesModal" onclick="if(event.target===this)closeDuplicatesModal()">
+    <div class="modal-sheet" style="max-height:85dvh">
+      <div class="modal-handle"></div>
+      <div class="modal-title">🔍 Possíveis duplicados</div>
+      <p style="font-size:12px;color:var(--text-hint);margin-top:-8px;margin-bottom:16px">Lançamentos com a mesma pessoa, categoria, valor e data — geralmente sinal de toque duplo ao salvar. Confira e exclua o que for repetido.</p>
+      <div id="duplicatesBody"></div>
+      <button class="btn-primary" onclick="closeDuplicatesModal()">Fechar</button>
     </div>
   </div>
 
@@ -2819,6 +2831,9 @@ if ('launchQueue' in window) {
 // ── Modal ──
 function openAddModal(editId = null) {
   editingId = editId;
+  window._submittingExpense = false;
+  const submitBtnEl = document.getElementById('submitBtn');
+  if (submitBtnEl) submitBtnEl.disabled = false;
   document.getElementById('modalTitle').textContent = editId ? 'Editar gasto' : 'Novo gasto';
   document.getElementById('submitBtn').textContent = editId ? 'Salvar alterações' : 'Adicionar gasto';
 
@@ -2894,6 +2909,8 @@ function confirmDelete() {
   vibrate([50, 30, 50]);
   showToast('🗑️ Gasto excluído');
   syncDelete(idToDelete);
+  const dupModal = document.getElementById('duplicatesModal');
+  if (dupModal && dupModal.classList.contains('open')) openDuplicatesModal();
 }
 
 // ── Submit ──
@@ -2906,74 +2923,87 @@ async function submitExpense() {
   if (!selectedCategory) { showToast('⚠️ Selecione uma categoria'); vibrate(100); return; }
   if (!date) { showToast('⚠️ Selecione uma data'); vibrate(100); return; }
 
-  const cat = getAllCategories().find(c => c.id === selectedCategory);
+  // Trava contra clique duplo: sem isso, um segundo toque antes do modal
+  // fechar visualmente cria dois lançamentos com IDs diferentes (cada um
+  // sincroniza normalmente com o Firebase, então os dois "grudam").
+  if (window._submittingExpense) return;
+  window._submittingExpense = true;
+  const submitBtn = document.getElementById('submitBtn');
+  if (submitBtn) submitBtn.disabled = true;
 
-  if (editingId) {
-    // Edit existing
-    const idx = expenses.findIndex(e => e.id === editingId);
-    if (idx !== -1) {
-      expenses[idx] = { ...expenses[idx], person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, synced: false, updatedAt: new Date().toISOString() };
-    }
-    saveToStorage();
-    closeModal();
-    updateHeader();
-    renderExpenses();
-    renderStats();
-    vibrate(40);
-    showToast('✏️ Gasto atualizado!');
-    syncExpense(expenses.find(e => e.id === editingId), 'updateExpense');
-  } else {
-    if (installmentActive) {
-      const count = parseInt(document.getElementById('installmentCount').value) || 0;
-      const rawTotal = document.getElementById('installmentTotal').value.replace(/\./g,'').replace(',','.');
-      const total = parseFloat(rawTotal) || 0;
-      if (count >= 2 && total > 0) {
-        const perMonth = total / count;
-        const baseId = Date.now().toString(36);
-        const baseDate = new Date(date + 'T12:00:00');
-        for (let i = 0; i < count; i++) {
-          let iDate;
-          if (i === 0) {
-            // Primeira parcela: mantém a data original do lançamento
-            iDate = date;
-          } else {
-            // Demais parcelas: sempre dia 01 do mês seguinte
-            const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1);
-            iDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
-          }
-          const installment = {
-            id: baseId + '_p' + (i+1),
-            person: selectedPerson, amount: perMonth,
-            category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
-            description: `${desc||cat.label} (${i+1}/${count})`,
-            date: iDate, createdAt: new Date().toISOString(), synced: false,
-            isInstallment: true, installmentNum: i+1, installmentTotal: count
-          };
-          expenses.unshift(installment);
-          syncExpense(installment);
-        }
-        expenses.sort((a,b) => b.date.localeCompare(a.date));
-        saveToStorage();
-        closeModal();
-        updateHeader();
-        renderExpenses();
-        renderStats();
-        vibrate(40);
-        showToast(`💳 ${count} parcelas de ${fmtCurrency(perMonth)} lançadas!`);
-        return;
+  try {
+    const cat = getAllCategories().find(c => c.id === selectedCategory);
+
+    if (editingId) {
+      // Edit existing
+      const idx = expenses.findIndex(e => e.id === editingId);
+      if (idx !== -1) {
+        expenses[idx] = { ...expenses[idx], person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, synced: false, updatedAt: new Date().toISOString() };
       }
-    }
+      saveToStorage();
+      closeModal();
+      updateHeader();
+      renderExpenses();
+      renderStats();
+      vibrate(40);
+      showToast('✏️ Gasto atualizado!');
+      syncExpense(expenses.find(e => e.id === editingId), 'updateExpense');
+    } else {
+      if (installmentActive) {
+        const count = parseInt(document.getElementById('installmentCount').value) || 0;
+        const rawTotal = document.getElementById('installmentTotal').value.replace(/\./g,'').replace(',','.');
+        const total = parseFloat(rawTotal) || 0;
+        if (count >= 2 && total > 0) {
+          const perMonth = total / count;
+          const baseId = Date.now().toString(36);
+          const baseDate = new Date(date + 'T12:00:00');
+          for (let i = 0; i < count; i++) {
+            let iDate;
+            if (i === 0) {
+              // Primeira parcela: mantém a data original do lançamento
+              iDate = date;
+            } else {
+              // Demais parcelas: sempre dia 01 do mês seguinte
+              const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1);
+              iDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+            }
+            const installment = {
+              id: baseId + '_p' + (i+1),
+              person: selectedPerson, amount: perMonth,
+              category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
+              description: `${desc||cat.label} (${i+1}/${count})`,
+              date: iDate, createdAt: new Date().toISOString(), synced: false,
+              isInstallment: true, installmentNum: i+1, installmentTotal: count
+            };
+            expenses.unshift(installment);
+            syncExpense(installment);
+          }
+          expenses.sort((a,b) => b.date.localeCompare(a.date));
+          saveToStorage();
+          closeModal();
+          updateHeader();
+          renderExpenses();
+          renderStats();
+          vibrate(40);
+          showToast(`💳 ${count} parcelas de ${fmtCurrency(perMonth)} lançadas!`);
+          return;
+        }
+      }
 
-    const expense = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, createdAt: new Date().toISOString(), synced: false };
-    expenses.unshift(expense);
-    saveToStorage();
-    closeModal();
-    updateHeader();
-    renderExpenses();
-    renderStats();
-    vibrate(40);
-    showToast(`${cat.icon} Gasto adicionado!`);
-    syncExpense(expense);
+      const expense = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), person: selectedPerson, amount, category: selectedCategory, categoryLabel: cat.label, categoryIcon: cat.icon, description: desc || cat.label, date, createdAt: new Date().toISOString(), synced: false };
+      expenses.unshift(expense);
+      saveToStorage();
+      closeModal();
+      updateHeader();
+      renderExpenses();
+      renderStats();
+      vibrate(40);
+      showToast(`${cat.icon} Gasto adicionado!`);
+      syncExpense(expense);
+    }
+  } finally {
+    window._submittingExpense = false;
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -5680,6 +5710,51 @@ function addToTrash(expense) {
 function updateTrashCount() {
   var el = document.getElementById('trashCount');
   if (el) el.textContent = deletedExpenses.length;
+}
+
+// ── Detectar possíveis duplicados ──
+// Agrupa lançamentos com a mesma pessoa + categoria + valor + data.
+// Parcelas e gastos fixos ficam de fora porque têm repetição legítima
+// (mesma descrição em meses diferentes, ou parcelas do mesmo dia 01).
+function findDuplicateExpenses() {
+  const groups = {};
+  expenses.forEach(e => {
+    if (e.isInstallment || e.isRecurring || e.isPendingValue) return;
+    const key = [e.person, e.category || e.categoryLabel, e.amount, e.date].join('|');
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(e);
+  });
+  return Object.values(groups).filter(g => g.length > 1);
+}
+
+function openDuplicatesModal() {
+  const body = document.getElementById('duplicatesBody');
+  if (!body) return;
+  const groups = findDuplicateExpenses();
+
+  if (!groups.length) {
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Nenhum duplicado encontrado</div><div class="empty-desc">Não achei lançamentos com a mesma pessoa, categoria, valor e data.</div></div>';
+  } else {
+    body.innerHTML = groups.map(g => {
+      const e0 = g[0];
+      const dateLabel = e0.date.split('-').reverse().join('/');
+      return '<div style="margin-bottom:16px;padding:10px;background:var(--amber-50);border:1px solid var(--amber-200);border-radius:12px">'
+        + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">' + (e0.categoryIcon||'📋') + ' ' + e0.categoryLabel + ' · ' + fmtCurrency(e0.amount) + ' · ' + dateLabel + '</div>'
+        + g.map(e => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px">${e.description}</div>
+              <div style="font-size:11px;color:var(--text-hint)">${e.person}</div>
+            </div>
+            <button class="btn-secondary" style="padding:6px 10px;font-size:12px;margin:0;color:var(--red-700)" onclick="openDelModal('${e.id}')">🗑️ Excluir</button>
+          </div>`).join('')
+        + '</div>';
+    }).join('');
+  }
+  document.getElementById('duplicatesModal').classList.add('open');
+}
+
+function closeDuplicatesModal() {
+  document.getElementById('duplicatesModal').classList.remove('open');
 }
 
 function openTrashModal() {
