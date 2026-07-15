@@ -5797,15 +5797,20 @@ function openDuplicatesModal() {
       + '<p style="font-size:11px;color:var(--text-hint);margin-top:-4px;margin-bottom:10px">Essa é a causa mais comum: duas regras iguais, cada uma gerando o gasto todo mês. Remover aqui apaga a regra E os lançamentos que ela já criou.</p>'
       + ruleGroups.map(g => {
         const r0 = g[0];
+        const catLabel0 = r0.categoryLabel || r0.category || 'Sem categoria';
         return '<div style="margin-bottom:16px;padding:10px;background:var(--red-50);border:1px solid var(--red-200);border-radius:12px">'
-          + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">' + (r0.categoryIcon||'📋') + ' ' + r0.categoryLabel + ' · ' + fmtCurrency(r0.amount) + ' · dia ' + r0.day + '</div>'
-          + g.map(r => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
+          + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">' + (r0.categoryIcon||'📋') + ' ' + catLabel0 + ' · ' + fmtCurrency(r0.amount) + ' · dia ' + r0.day + '</div>'
+          + g.map(r => {
+              const desc = r.description || '(sem descrição)';
+              const person = r.person || '?';
+              return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
               <div style="flex:1;min-width:0">
-                <div style="font-size:13px">${r.description}</div>
-                <div style="font-size:11px;color:var(--text-hint)">${r.person} · criada em ${r.startMonth || '?'}</div>
+                <div style="font-size:13px">${desc}</div>
+                <div style="font-size:11px;color:var(--text-hint)">${person} · id: ${r.id} · criada em ${r.startMonth || '?'}</div>
               </div>
               <button class="btn-secondary" style="padding:6px 10px;font-size:12px;margin:0;color:var(--red-700)" onclick="deleteDuplicateRecurRule('${r.id}')">🗑️ Remover regra</button>
-            </div>`).join('')
+            </div>`;
+            }).join('')
           + '</div>';
       }).join('');
   }
@@ -5817,16 +5822,21 @@ function openDuplicatesModal() {
   } else {
     html += expGroups.map(g => {
       const e0 = g[0];
+      const catLabel = e0.categoryLabel || e0.category || 'Sem categoria';
       const dateLabel = e0.date.split('-').reverse().join('/');
       return '<div style="margin-bottom:16px;padding:10px;background:var(--amber-50);border:1px solid var(--amber-200);border-radius:12px">'
-        + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">' + (e0.categoryIcon||'📋') + ' ' + e0.categoryLabel + ' · ' + fmtCurrency(e0.amount) + ' · ' + dateLabel + '</div>'
-        + g.map(e => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
+        + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">' + (e0.categoryIcon||'📋') + ' ' + catLabel + ' · ' + fmtCurrency(e0.amount) + ' · ' + dateLabel + '</div>'
+        + g.map(e => {
+            const desc = e.description || '(sem descrição)';
+            const person = e.person || '?';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
             <div style="flex:1;min-width:0">
-              <div style="font-size:13px">${e.description}${e.isRecurring ? ' <span style="color:var(--text-hint);font-size:11px">(fixo)</span>' : ''}</div>
-              <div style="font-size:11px;color:var(--text-hint)">${e.person}</div>
+              <div style="font-size:13px">${desc}${e.isRecurring ? ' <span style="color:var(--text-hint);font-size:11px">(fixo)</span>' : ''}</div>
+              <div style="font-size:11px;color:var(--text-hint)">${person} · id: ${e.id}</div>
             </div>
             <button class="btn-secondary" style="padding:6px 10px;font-size:12px;margin:0;color:var(--red-700)" onclick="openDelModal('${e.id}')">🗑️ Excluir</button>
-          </div>`).join('')
+          </div>`;
+            }).join('')
         + '</div>';
     }).join('');
   }
