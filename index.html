@@ -168,7 +168,7 @@
     #app { max-width: 430px; margin: 0 auto; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 
     /* Header */
-    .header { background: var(--header-bg, var(--green-700)); padding: 20px 20px 0; flex-shrink: 0; position: relative; overflow: hidden; }
+    .header { background: var(--header-bg, var(--green-700)); background-image: var(--header-bg-image, none); background-size: var(--header-bg-size, auto); padding: 20px 20px 0; flex-shrink: 0; position: relative; overflow: hidden; }
     .header::before { content: ''; position: absolute; top: -60px; right: -40px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.04); }
     .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
     .app-title { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.6); letter-spacing: 0.08em; text-transform: uppercase; }
@@ -786,6 +786,21 @@
       </div>
       <div id="budgetAlertWrap" style="display:none"></div>
 
+      <!-- Termômetro financeiro -->
+      <div id="thermometerWrap" style="display:none;align-items:center;gap:12px;margin-bottom:10px;padding:10px 14px;background:var(--surface-raised);border-radius:var(--radius-sm);border:1px solid var(--border)">
+        <div style="display:flex;flex-direction:column;align-items:center;width:20px;flex-shrink:0">
+          <div style="width:14px;height:56px;border-radius:7px 7px 0 0;background:var(--surface);border:1px solid var(--border-strong);border-bottom:none;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end">
+            <div id="thermometerFill" style="width:100%;height:0%;background:var(--green-500);transition:height 0.4s"></div>
+          </div>
+          <div id="thermometerBulb" style="width:20px;height:20px;border-radius:50%;background:var(--green-500);border:1px solid var(--border-strong);margin-top:-1px;flex-shrink:0"></div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:var(--text-hint);text-transform:uppercase;letter-spacing:0.06em">Termômetro financeiro</div>
+          <div style="font-size:16px;font-weight:800" id="thermometerPct">0%</div>
+          <div style="font-size:11px;color:var(--text-hint)" id="thermometerInfo"></div>
+        </div>
+      </div>
+
       <!-- Savings Goal Card -->
       <div id="savingsGoalCard" style="display:none" class="goal-card">
         <div class="goal-row">
@@ -824,6 +839,7 @@
       <button class="add-cat-btn" onclick="openRecurModal()">
         <span style="font-size:20px">+</span> Novo gasto fixo
       </button>
+      <div id="recurSuggestions"></div>
       <div id="recurList"></div>
     </div>
 
@@ -872,8 +888,13 @@
 
       <div class="card">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
-          <span>Comparativo mês anterior</span>
+          <span>Comparativo por categoria</span>
           <span style="font-size:10px;color:var(--text-hint);font-weight:500" id="compareMonthLabel"></span>
+        </div>
+        <div class="filter-options" style="margin-bottom:10px">
+          <button class="filter-option" id="cmpMode-prev" onclick="setCompareMode('prev')">Mês anterior</button>
+          <button class="filter-option" id="cmpMode-avg3" onclick="setCompareMode('avg3')">Média 3m</button>
+          <button class="filter-option" id="cmpMode-avg6" onclick="setCompareMode('avg6')">Média 6m</button>
         </div>
         <div id="categoryCompare"></div>
       </div>
@@ -925,7 +946,13 @@
 
       <!-- Annual Summary -->
       <div class="card">
-        <div class="card-title">Resumo anual</div>
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Resumo anual</span>
+          <div class="filter-options" style="margin:0">
+            <button class="filter-option" id="annualView-list" onclick="setAnnualView('list')">Lista</button>
+            <button class="filter-option" id="annualView-grid" onclick="setAnnualView('grid')">Grid</button>
+          </div>
+        </div>
         <div class="year-nav">
           <button class="year-nav-btn" onclick="changeYear(-1)">‹</button>
           <div class="year-label" id="yearLabel">2026</div>
@@ -1033,6 +1060,14 @@
             <button class="color-opt" data-color="ocean" onclick="applyColor('ocean')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0f2027,#2c5364);border:2px solid transparent;cursor:pointer" title="Oceano profundo"></button>
             <button class="color-opt" data-color="night" onclick="applyColor('night')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);border:2px solid transparent;cursor:pointer" title="Roxo noturno"></button>
           </div>
+          <div style="font-size:13px;font-weight:600;margin:14px 0 10px">Texturas</div>
+          <p style="font-size:11px;color:var(--text-hint);margin:-6px 0 10px">Padrões visuais em vez de imagens de fundo — leves e sem depender de arquivos externos.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="color-opt" data-color="dots" onclick="applyColor('dots')" style="width:36px;height:36px;border-radius:50%;background-color:#0F6E56;background-image:radial-gradient(rgba(255,255,255,0.35) 1.4px, transparent 1.4px);background-size:7px 7px;border:2px solid transparent;cursor:pointer" title="Pontilhado"></button>
+            <button class="color-opt" data-color="diagonal" onclick="applyColor('diagonal')" style="width:36px;height:36px;border-radius:50%;background-color:#534AB7;background-image:repeating-linear-gradient(45deg, rgba(255,255,255,0.22) 0 4px, transparent 4px 9px);border:2px solid transparent;cursor:pointer" title="Diagonal"></button>
+            <button class="color-opt" data-color="mesh" onclick="applyColor('mesh')" style="width:36px;height:36px;border-radius:50%;background-color:#1a1a2e;background-image:radial-gradient(at 25% 25%, rgba(103,126,234,0.85) 0, transparent 60%), radial-gradient(at 80% 10%, rgba(147,51,234,0.75) 0, transparent 55%), radial-gradient(at 50% 100%, rgba(56,239,125,0.6) 0, transparent 55%);border:2px solid transparent;cursor:pointer" title="Mesh colorido"></button>
+            <button class="color-opt" data-color="waves" onclick="applyColor('waves')" style="width:36px;height:36px;border-radius:50%;background-color:#185FA5;background-image:radial-gradient(circle at 15% 25%, rgba(255,255,255,0.4) 0 2px, transparent 3px), radial-gradient(circle at 60% 65%, rgba(255,255,255,0.35) 0 2px, transparent 3px), radial-gradient(circle at 85% 30%, rgba(255,255,255,0.3) 0 2px, transparent 3px);border:2px solid transparent;cursor:pointer" title="Bolhas"></button>
+          </div>
         </div>
       </div>
 
@@ -1107,6 +1142,15 @@
         <button class="btn-secondary" onclick="migrateInstallments()" style="margin-bottom:8px">💳 Reorganizar parcelas existentes</button>
         <button class="btn-secondary" onclick="openTrashModal()" style="margin-bottom:8px">🗑️ Lixeira <span id="trashCount" style="background:var(--red-500);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px">0</span></button>
         <button class="btn-danger" onclick="clearData()">🗑️ Limpar dados locais</button>
+      </div>
+
+      <div class="config-section">
+        <div class="config-section-title">Backup automático</div>
+        <div class="card">
+          <p style="font-size:12px;color:var(--text-hint);margin-bottom:8px">Uma cópia completa dos dados é guardada neste celular a cada 7 dias, além dos backups manuais. Serve de proteção extra se algo der errado com a sincronização.</p>
+          <button class="btn-secondary" style="margin-bottom:8px" onclick="createAutoBackup()">💾 Criar backup agora</button>
+          <div id="autoBackupList"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -2008,6 +2052,8 @@ function init() {
   }
   loadSavingsGoal();
   currentYear = new Date().getFullYear();
+  maybeCreateAutoBackup();
+  renderAutoBackupList();
 
   // Se o app foi aberto pelo atalho "Lançar por voz", isso tem prioridade
   // sobre o resumo automático — não faz sentido competir com o modal de voz.
@@ -3179,6 +3225,30 @@ function togglePendingGroup() {
 }
 
 // ── Update header ──
+// ── Termômetro financeiro (tela inicial) ──
+// Visual distinto da barra de orçamento do cabeçalho — pensado para dar uma
+// leitura rápida e "de relance" do quanto já foi gasto no período atual.
+function updateThermometer(spent, totalBudget) {
+  const wrap = document.getElementById('thermometerWrap');
+  if (!wrap) return;
+  if (!totalBudget || totalBudget <= 0) { wrap.style.display = 'none'; return; }
+
+  wrap.style.display = 'flex';
+  const pct = Math.min((spent / totalBudget) * 100, 100);
+  let color = 'var(--green-500)', statusText = 'no ritmo';
+  if (pct >= 100) { color = 'var(--red-500)'; statusText = 'estourou o orçamento'; }
+  else if (pct >= 80) { color = 'var(--amber-500)'; statusText = 'atenção, quase lá'; }
+
+  const fill = document.getElementById('thermometerFill');
+  const bulb = document.getElementById('thermometerBulb');
+  const pctEl = document.getElementById('thermometerPct');
+  const infoEl = document.getElementById('thermometerInfo');
+  if (fill) { fill.style.height = pct.toFixed(0) + '%'; fill.style.background = color; }
+  if (bulb) bulb.style.background = color;
+  if (pctEl) { pctEl.textContent = pct.toFixed(0) + '%'; pctEl.style.color = color; }
+  if (infoEl) infoEl.textContent = fmtCurrency(spent) + ' de ' + fmtCurrency(totalBudget) + ' · ' + statusText;
+}
+
 function updateHeader() {
   const month = filterExpensesInView(expenses);
   const total = month.reduce((s,e) => s+e.amount, 0);
@@ -3191,6 +3261,7 @@ function updateHeader() {
 
   // Header boxes — soma dos orçamentos definidos por categoria
   const totalCatBudget = Object.values(categoryBudgets).reduce((s,v) => s+v, 0);
+  updateThermometer(total, totalCatBudget);
   const hBudget = document.getElementById('headerBudget');
   const hBudgetSub = document.getElementById('headerBudgetSub');
   const hSpentSub = document.getElementById('headerSpentSub');
@@ -4097,7 +4168,86 @@ function checkAndLaunchRecurring() {
   renderExpenses();
 }
 
+// ── Detecção de gastos recorrentes esquecidos ──
+// Procura descrições que se repetem em pelo menos 3 dos últimos 6 meses e
+// que ainda não são fixas — sugere "tornar fixo" em vez de adivinhar.
+let recurSuggestionCandidates = [];
+
+function detectRecurringCandidates() {
+  const dismissed = new Set(JSON.parse(localStorage.getItem('fin_recur_dismissed') || '[]'));
+  const recurringDescs = new Set(recurringExpenses.map(r => normStr(r.description)));
+
+  const now = new Date();
+  const monthKeys = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthKeys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  }
+
+  const groups = {};
+  expenses.forEach(e => {
+    if (e.isPendingValue || e.isRecurring || e.recurringId || e.isInstallment) return;
+    if (!e.description) return;
+    const key = normStr(e.description);
+    if (!key || key.length < 3) return;
+    const monthKey = (e.date || '').slice(0, 7);
+    if (!monthKeys.includes(monthKey)) return;
+    if (!groups[key]) groups[key] = { months: new Set(), items: [] };
+    groups[key].months.add(monthKey);
+    groups[key].items.push(e);
+  });
+
+  const candidates = [];
+  Object.keys(groups).forEach(key => {
+    if (dismissed.has(key) || recurringDescs.has(key)) return;
+    const g = groups[key];
+    if (g.months.size >= 3) {
+      const sorted = g.items.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      const latest = sorted[0];
+      const avg = g.items.reduce((s, e) => s + e.amount, 0) / g.items.length;
+      candidates.push({
+        key, monthsCount: g.months.size, latestExpenseId: latest.id,
+        description: latest.description, categoryIcon: latest.categoryIcon,
+        avgAmount: avg
+      });
+    }
+  });
+  candidates.sort((a, b) => b.monthsCount - a.monthsCount);
+  return candidates;
+}
+
+function renderRecurSuggestions() {
+  const wrap = document.getElementById('recurSuggestions');
+  if (!wrap) return;
+  recurSuggestionCandidates = detectRecurringCandidates();
+  if (!recurSuggestionCandidates.length) { wrap.innerHTML = ''; return; }
+
+  wrap.innerHTML = '<div class="card" style="margin-bottom:14px;background:var(--amber-50);border-color:var(--amber-200)">'
+    + '<div class="card-title" style="margin-bottom:8px">💡 Parecem gastos fixos</div>'
+    + recurSuggestionCandidates.map((c, i) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border)">
+        <div class="expense-cat-icon">${c.categoryIcon || '📋'}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${c.description}</div>
+          <div style="font-size:11px;color:var(--text-hint)">Apareceu em ${c.monthsCount} dos últimos 6 meses · ~${fmtCurrency(c.avgAmount)}</div>
+        </div>
+        <button class="btn-secondary" style="padding:6px 10px;font-size:12px;margin:0" onclick="dismissRecurSuggestion(${i})">Ignorar</button>
+        <button class="btn-primary" style="padding:6px 10px;font-size:12px;margin:0" onclick="openMakeRecurModal('${c.latestExpenseId}')">🔁 Tornar fixo</button>
+      </div>`).join('')
+    + '</div>';
+}
+
+function dismissRecurSuggestion(i) {
+  const c = recurSuggestionCandidates[i];
+  if (!c) return;
+  const dismissed = JSON.parse(localStorage.getItem('fin_recur_dismissed') || '[]');
+  if (!dismissed.includes(c.key)) dismissed.push(c.key);
+  localStorage.setItem('fin_recur_dismissed', JSON.stringify(dismissed));
+  renderRecurSuggestions();
+}
+
 function renderRecurList() {
+  renderRecurSuggestions();
   const list = document.getElementById('recurList');
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -4677,36 +4827,72 @@ function updateQuickCatSelection(id) {
 // ════════════════════════════════════════════
 // CATEGORY COMPARISON (month vs previous)
 // ════════════════════════════════════════════
+let compareMode = localStorage.getItem('fin_compare_mode') || 'prev';
+
+function setCompareMode(mode) {
+  compareMode = mode;
+  localStorage.setItem('fin_compare_mode', mode);
+  renderCategoryComparison();
+}
+
+function updateCompareModeUI() {
+  ['prev', 'avg3', 'avg6'].forEach(m => {
+    const btn = document.getElementById('cmpMode-' + m);
+    if (btn) btn.className = 'filter-option' + (compareMode === m ? ' sel' : '');
+  });
+}
+
 function renderCategoryComparison() {
+  updateCompareModeUI();
   const { year, month } = getViewMonth();
   const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-  // Current month
   const curPrefix = `${year}-${String(month).padStart(2,'0')}`;
-  // Previous month
-  const prevDate = new Date(year, month-2, 1);
-  const prevPrefix = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
-  const prevLabel = months[prevDate.getMonth()];
-
-  const labelEl = document.getElementById('compareMonthLabel');
-  if (labelEl) labelEl.textContent = `vs ${prevLabel}/${prevDate.getFullYear()}`;
-
   const curExp = expenses.filter(e => e.date.startsWith(curPrefix));
-  const prevExp = expenses.filter(e => e.date.startsWith(prevPrefix));
-
-  // Group by category
   const curByCat = {};
   curExp.forEach(e => { curByCat[e.categoryLabel] = (curByCat[e.categoryLabel]||{sum:0,icon:e.categoryIcon}); curByCat[e.categoryLabel].sum+=e.amount; });
-  const prevByCat = {};
-  prevExp.forEach(e => { prevByCat[e.categoryLabel] = (prevByCat[e.categoryLabel]||{sum:0,icon:e.categoryIcon}); prevByCat[e.categoryLabel].sum+=e.amount; });
+
+  const labelEl = document.getElementById('compareMonthLabel');
+  const compareByCat = {};
+  let compareLabelText, compareSuffix;
+
+  if (compareMode === 'avg3' || compareMode === 'avg6') {
+    // Média dos N meses ANTERIORES ao mês em exibição (não inclui o atual).
+    const n = compareMode === 'avg3' ? 3 : 6;
+    const sums = {};
+    for (let i = 1; i <= n; i++) {
+      const d = new Date(year, month - 1 - i, 1);
+      const prefix = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      expenses.filter(e => e.date.startsWith(prefix)).forEach(e => {
+        sums[e.categoryLabel] = sums[e.categoryLabel] || { sum: 0, icon: e.categoryIcon };
+        sums[e.categoryLabel].sum += e.amount;
+      });
+    }
+    Object.keys(sums).forEach(label => {
+      compareByCat[label] = { sum: sums[label].sum / n, icon: sums[label].icon };
+    });
+    compareLabelText = `vs média ${n}m`;
+    compareSuffix = 'média';
+  } else {
+    const prevDate = new Date(year, month-2, 1);
+    const prevPrefix = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
+    const prevLabel = months[prevDate.getMonth()];
+    expenses.filter(e => e.date.startsWith(prevPrefix)).forEach(e => {
+      compareByCat[e.categoryLabel] = compareByCat[e.categoryLabel] || { sum: 0, icon: e.categoryIcon };
+      compareByCat[e.categoryLabel].sum += e.amount;
+    });
+    compareLabelText = `vs ${prevLabel}/${prevDate.getFullYear()}`;
+    compareSuffix = 'anterior';
+  }
+  if (labelEl) labelEl.textContent = compareLabelText;
 
   // Merge all categories
-  const allLabels = new Set([...Object.keys(curByCat), ...Object.keys(prevByCat)]);
+  const allLabels = new Set([...Object.keys(curByCat), ...Object.keys(compareByCat)]);
   const rows = Array.from(allLabels).map(label => ({
     label,
-    icon: (curByCat[label]||prevByCat[label]).icon,
+    icon: (curByCat[label]||compareByCat[label]).icon,
     cur: curByCat[label]?.sum || 0,
-    prev: prevByCat[label]?.sum || 0,
+    prev: compareByCat[label]?.sum || 0,
   })).sort((a,b) => b.cur - a.cur).slice(0,8);
 
   const container = document.getElementById('categoryCompare');
@@ -4727,7 +4913,7 @@ function renderCategoryComparison() {
       <div class="cat-compare-icon">${r.icon}</div>
       <div class="cat-compare-info">
         <div class="cat-compare-name">${r.label}</div>
-        <div class="cat-compare-amounts">${fmtCurrency(r.cur)} este mês · ${r.prev>0?fmtCurrency(r.prev)+' anterior':'sem dados anteriores'}</div>
+        <div class="cat-compare-amounts">${fmtCurrency(r.cur)} este mês · ${r.prev>0?fmtCurrency(r.prev)+' '+compareSuffix:'sem dados anteriores'}</div>
       </div>
       <div class="cat-compare-diff ${diffClass}">${diffIcon} ${diffText}</div>
     </div>`;
@@ -4909,32 +5095,68 @@ function changeYear(dir) {
   renderAnnualSummary();
 }
 
+let annualViewMode = localStorage.getItem('fin_annual_view') || 'list';
+
+function setAnnualView(mode) {
+  annualViewMode = mode;
+  localStorage.setItem('fin_annual_view', mode);
+  renderAnnualSummary();
+}
+
 function renderAnnualSummary() {
   const el = document.getElementById('annualSummary');
   const yearEl = document.getElementById('yearLabel');
   if (!el) return;
   if (yearEl) yearEl.textContent = currentYear;
 
+  ['list', 'grid'].forEach(m => {
+    const btn = document.getElementById('annualView-' + m);
+    if (btn) btn.className = 'filter-option' + (annualViewMode === m ? ' sel' : '');
+  });
+
   const monthLabels = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const currentMonthNum = new Date().getMonth() + 1;
   const thisYear = new Date().getFullYear();
 
-  const monthData = monthLabels.map((label, i) => {
+  const allMonthData = monthLabels.map((label, i) => {
     const month = i + 1;
     const prefix = `${currentYear}-${String(month).padStart(2,'0')}`;
     const total = expenses.filter(e => e.date.startsWith(prefix)).reduce((s,e) => s+e.amount, 0);
     const isCurrent = currentYear === thisYear && month === currentMonthNum;
     const isFuture = currentYear === thisYear && month > currentMonthNum;
     return { label, month, prefix, total, isCurrent, isFuture };
-  }).filter(m => !m.isFuture || m.total > 0);
+  });
 
-  const maxTotal = Math.max(...monthData.map(m => m.total), 1);
-  const yearTotal = monthData.reduce((s,m) => s+m.total, 0);
-  const yearAvg = monthData.filter(m => m.total > 0).length > 0
-    ? yearTotal / monthData.filter(m => m.total > 0).length : 0;
+  const monthData = allMonthData.filter(m => !m.isFuture || m.total > 0);
 
   if (!monthData.some(m => m.total > 0)) {
     el.innerHTML = '<p style="font-size:13px;color:var(--text-hint);text-align:center;padding:16px 0">Sem dados em ' + currentYear + '</p>';
+    return;
+  }
+
+  const maxTotal = Math.max(...monthData.map(m => m.total), 1);
+  const yearTotal = monthData.reduce((s,m) => s+m.total, 0);
+  const monthsWithData = monthData.filter(m => m.total > 0).length;
+  const yearAvg = monthsWithData > 0 ? yearTotal / monthsWithData : 0;
+  const totalsFooter = `<div class="annual-total">Total ${currentYear}: ${fmtCurrency(yearTotal)} · Média: ${fmtCurrency(yearAvg)}/mês</div>`;
+
+  if (annualViewMode === 'grid') {
+    // Grid com os 12 meses do ano (inclusive os futuros, apagados), cor mais
+    // forte = mês de maior gasto. Tocar num mês com dados pula para ele.
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
+      + allMonthData.map(m => {
+        const intensity = m.total > 0 ? Math.max(0.15, m.total / maxTotal) : 0;
+        const hasData = m.total > 0 && !m.isFuture;
+        const bg = hasData ? `rgba(29,158,117,${intensity.toFixed(2)})` : 'var(--surface-raised)';
+        const textColor = (hasData && intensity > 0.5) ? '#fff' : 'var(--text)';
+        const clickable = !m.isFuture || m.total > 0;
+        const border = m.isCurrent ? 'border:2px solid var(--green-600)' : 'border:1px solid var(--border)';
+        return `<div ${clickable ? `onclick="jumpToMonth('${m.prefix}')"` : ''} style="border-radius:10px;padding:10px 4px;text-align:center;cursor:${clickable ? 'pointer' : 'default'};background:${bg};${border};opacity:${m.isFuture && m.total===0 ? '0.45' : '1'}">
+          <div style="font-size:11px;font-weight:700;color:${textColor}">${m.label}</div>
+          <div style="font-size:10px;color:${textColor};margin-top:2px">${m.total > 0 ? fmtCurrency(m.total) : '—'}</div>
+        </div>`;
+      }).join('')
+      + '</div>' + totalsFooter;
     return;
   }
 
@@ -4947,8 +5169,7 @@ function renderAnnualSummary() {
         </div>
       </div>
       <div class="annual-month-amount">${m.total > 0 ? fmtCurrency(m.total) : '—'}</div>
-    </div>`).join('') +
-    `<div class="annual-total">Total ${currentYear}: ${fmtCurrency(yearTotal)} · Média: ${fmtCurrency(yearAvg)}/mês</div>`;
+    </div>`).join('') + totalsFooter;
 }
 
 // ════════════════════════════════════════════
@@ -5255,6 +5476,112 @@ function exportPDF() {
   a.download = 'gastos_' + title.replace(/\s/g,'_') + '.html';
   a.click();
   showToast('\uD83D\uDCC4 Abra o arquivo e use Ctrl+P para salvar como PDF');
+}
+
+// ── Backup automático agendado ──
+// Guarda snapshots completos no próprio localStorage (sem depender de rede
+// nem do Firebase) — uma proteção extra além dos backups manuais que já
+// existiam. Mantém só os últimos N para não estourar o espaço do navegador.
+const AUTOBACKUP_INTERVAL_DAYS = 7;
+const AUTOBACKUP_MAX_COUNT = 5;
+
+function maybeCreateAutoBackup() {
+  try {
+    const last = localStorage.getItem('fin_last_autobackup');
+    const now = Date.now();
+    if (last && (now - parseInt(last, 10)) < AUTOBACKUP_INTERVAL_DAYS * 24 * 60 * 60 * 1000) return;
+    createAutoBackup();
+  } catch (e) { /* nunca deixa isso quebrar o carregamento do app */ }
+}
+
+function createAutoBackup() {
+  const snapshot = {
+    date: new Date().toISOString(),
+    expenses, customCategories, categoryBudgets, recurringExpenses, savingsGoal
+  };
+  const key = 'fin_autobackup_' + Date.now();
+  localStorage.setItem(key, JSON.stringify(snapshot));
+  localStorage.setItem('fin_last_autobackup', String(Date.now()));
+
+  let index = JSON.parse(localStorage.getItem('fin_autobackup_index') || '[]');
+  index.push(key);
+  while (index.length > AUTOBACKUP_MAX_COUNT) {
+    const oldest = index.shift();
+    localStorage.removeItem(oldest);
+  }
+  localStorage.setItem('fin_autobackup_index', JSON.stringify(index));
+  renderAutoBackupList();
+  showToast('💾 Backup automático criado');
+}
+
+function getAutoBackups() {
+  const index = JSON.parse(localStorage.getItem('fin_autobackup_index') || '[]');
+  return index.map(key => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      return { key, date: data.date, count: (data.expenses || []).length };
+    } catch (e) { return null; }
+  }).filter(Boolean).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function renderAutoBackupList() {
+  const wrap = document.getElementById('autoBackupList');
+  if (!wrap) return;
+  const backups = getAutoBackups();
+  if (!backups.length) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--text-hint);padding:6px 0">Nenhum backup automático ainda — o primeiro é criado sozinho a cada 7 dias de uso.</p>';
+    return;
+  }
+  wrap.innerHTML = backups.map(b => {
+    const d = new Date(b.date);
+    const label = d.toLocaleDateString('pt-BR', {day:'2-digit',month:'short',year:'numeric'}) + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${label}</div>
+        <div style="font-size:11px;color:var(--text-hint)">${b.count} lançamento(s)</div>
+      </div>
+      <button class="btn-secondary" style="padding:6px 10px;font-size:12px;margin:0" onclick="downloadAutoBackup('${b.key}')">⬇️ Baixar</button>
+      <button class="btn-secondary" style="padding:6px 10px;font-size:12px;margin:0;color:var(--red-700)" onclick="restoreAutoBackup('${b.key}')">↩️ Restaurar</button>
+    </div>`;
+  }).join('');
+}
+
+function downloadAutoBackup(key) {
+  const raw = localStorage.getItem(key);
+  if (!raw) { showToast('⚠️ Backup não encontrado'); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([raw], {type:'application/json'}));
+  a.download = 'gastos_familia_backup_' + key.replace('fin_autobackup_', '') + '.json';
+  a.click();
+  showToast('⬇️ Backup baixado');
+}
+
+function restoreAutoBackup(key) {
+  const raw = localStorage.getItem(key);
+  if (!raw) { showToast('⚠️ Backup não encontrado'); return; }
+  if (!confirm('Restaurar este backup vai SUBSTITUIR os dados atuais neste celular. Continuar?')) return;
+  try {
+    const data = JSON.parse(raw);
+    expenses = data.expenses || [];
+    customCategories = data.customCategories || [];
+    categoryBudgets = data.categoryBudgets || {};
+    recurringExpenses = data.recurringExpenses || [];
+    savingsGoal = data.savingsGoal || 0;
+    saveToStorage();
+    localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+    localStorage.setItem('fin_cat_budgets', JSON.stringify(categoryBudgets));
+    localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses));
+    localStorage.setItem('fin_savings_goal', String(savingsGoal));
+    updateHeader();
+    renderExpenses();
+    renderCategoryGrid();
+    renderCatScreen();
+    showToast('✅ Backup restaurado');
+  } catch (e) {
+    showToast('⚠️ Erro ao restaurar backup');
+  }
 }
 
 // ════ EXPORT ALL DATA ════
@@ -5755,16 +6082,35 @@ function applyColor(color) {
     ocean:    'linear-gradient(135deg,#0f2027,#2c5364)',
     night:    'linear-gradient(135deg,#667eea,#764ba2)'
   };
-  var bg = themes[color] || themes.green;
-  // Set CSS variable on root so it persists over stylesheet
-  document.documentElement.style.setProperty('--header-bg', bg);
-  // Solid colors for statusbar and splash (gradients need a single color)
+  // Temas de "textura": um padrão CSS (sem depender de arquivo de imagem)
+  // sobreposto a uma cor base — visual diferenciado das cores/gradientes lisos.
+  var textureThemes = {
+    dots:     { base: '#0F6E56', image: 'radial-gradient(rgba(255,255,255,0.28) 1.6px, transparent 1.6px)', size: '16px 16px' },
+    diagonal: { base: '#534AB7', image: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.14) 0 8px, transparent 8px 18px)', size: 'auto' },
+    mesh:     { base: '#1a1a2e', image: 'radial-gradient(at 20% 20%, rgba(103,126,234,0.55) 0, transparent 55%), radial-gradient(at 80% 0%, rgba(147,51,234,0.45) 0, transparent 50%), radial-gradient(at 50% 100%, rgba(56,239,125,0.32) 0, transparent 50%)', size: 'auto' },
+    waves:    { base: '#185FA5', image: 'radial-gradient(circle at 10% 20%, rgba(255,255,255,0.16) 0 3px, transparent 4px), radial-gradient(circle at 60% 70%, rgba(255,255,255,0.13) 0 4px, transparent 5px), radial-gradient(circle at 90% 30%, rgba(255,255,255,0.11) 0 3px, transparent 4px)', size: 'auto' }
+  };
+
+  if (textureThemes[color]) {
+    var t = textureThemes[color];
+    document.documentElement.style.setProperty('--header-bg', t.base);
+    document.documentElement.style.setProperty('--header-bg-image', t.image);
+    document.documentElement.style.setProperty('--header-bg-size', t.size);
+  } else {
+    var bg = themes[color] || themes.green;
+    document.documentElement.style.setProperty('--header-bg', bg);
+    document.documentElement.style.setProperty('--header-bg-image', 'none');
+    document.documentElement.style.setProperty('--header-bg-size', 'auto');
+  }
+
+  // Solid colors for statusbar and splash (gradientes/texturas precisam de uma cor única)
   var splashColors = {
     green:'#0F6E56', blue:'#185FA5', purple:'#534AB7',
     coral:'#993C1D', amber:'#BA7517',
     emerald:'#11998e', fire:'#c03a10', aurora:'#4776e6',
     midnight:'#1a1a2e', wine:'#c94b4b', storm:'#373b44',
-    sunrise:'#d47d10', rose:'#c040d0', ocean:'#0f2027', night:'#667eea'
+    sunrise:'#d47d10', rose:'#c040d0', ocean:'#0f2027', night:'#667eea',
+    dots:'#0F6E56', diagonal:'#534AB7', mesh:'#1a1a2e', waves:'#185FA5'
   };
   var solidColor = splashColors[color] || splashColors.green;
   // Update statusbar (Android PWA)
