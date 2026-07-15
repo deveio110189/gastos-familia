@@ -1922,11 +1922,22 @@ window.onFirebaseRecurring = function(data) {
     if (!localIds.has(rr.id)) { recurringExpenses.push(rr); added++; }
     else { const i=recurringExpenses.findIndex(x=>x.id===rr.id); if(i!==-1) recurringExpenses[i]=rr; }
   });
+  // Remove regras locais que sumiram do Firebase (ex: apagadas no outro
+  // celular). Sem isso, uma regra excluída em um aparelho vira "zumbi" no
+  // outro: continua lançando gasto todo mês e resincroniza a regra de volta
+  // pro Firebase, ressuscitando o que já tinha sido apagado. Mesmo padrão
+  // que onFirebaseExpenses já usa corretamente para os lançamentos.
+  const remoteIds = new Set(data.recurringExpenses.map(r => r.id));
+  const beforeCount = recurringExpenses.length;
+  recurringExpenses = recurringExpenses.filter(r => remoteIds.has(r.id));
+  const removed = beforeCount - recurringExpenses.length;
+
   localStorage.setItem('fin_recurring', JSON.stringify(recurringExpenses));
   if (data.updatedAt) localStorage.setItem('fin_recurring_updated', data.updatedAt);
   if (document.getElementById('screen-recur') &&
       document.getElementById('screen-recur').classList.contains('active')) renderRecurList();
   if (added > 0) showToast('🔄 ' + added + ' gasto(s) fixo(s) recebido(s)!');
+  if (removed > 0) showToast('🗑️ ' + removed + ' gasto(s) fixo(s) removido(s) (sincronizado do outro celular)');
 };
 
 // Listen for Firebase ready (after auth)
