@@ -1545,7 +1545,7 @@
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn-secondary" style="flex:1;margin-bottom:0" onclick="closeMakeRecurModal()">Cancelar</button>
-        <button class="btn-primary" style="flex:1" onclick="confirmMakeRecur()">&#9989; Confirmar</button>
+        <button class="btn-primary" id="mkRecurConfirmBtn" style="flex:1" onclick="confirmMakeRecur()">&#9989; Confirmar</button>
       </div>
     </div>
   </div>
@@ -4314,6 +4314,9 @@ function renderRecurList() {
 }
 
 function openRecurModal(editId) {
+  window._submittingRecur = false;
+  const recurSubmitBtnReset = document.getElementById('recurSubmitBtn');
+  if (recurSubmitBtnReset) recurSubmitBtnReset.disabled = false;
   editId = editId || null;
   editingRecurId = editId;
   selectedRecurCategory = null;
@@ -4394,102 +4397,117 @@ function submitRecur() {
   if (!selectedRecurCategory) { showToast('⚠️ Selecione uma categoria'); vibrate(100); return; }
   if (!day || day < 1 || day > 31) { showToast('⚠️ Informe um dia válido (1-31)'); vibrate(100); return; }
 
-  // Resolve duration
-  let totalMonths = 0;
-  if (selectedDuration === 'custom') {
-    totalMonths = parseInt(document.getElementById('recurDurationCustom').value) || 0;
-    if (totalMonths < 1) { showToast('⚠️ Informe a quantidade de meses'); vibrate(100); return; }
-  } else {
-    totalMonths = selectedDuration; // 0 = indeterminate
-  }
+  // Mesma trava do lançamento normal: sem isso, um segundo toque cria uma
+  // SEGUNDA regra de recorrência com recurId diferente, e cada uma passa a
+  // gerar seu próprio gasto todo mês — exatamente a duplicação persistente
+  // de "gastos fixos" que não some sozinha, porque viram duas regras
+  // genuinamente distintas.
+  if (window._submittingRecur) return;
+  window._submittingRecur = true;
+  const recurSubmitBtnEl = document.getElementById('recurSubmitBtn');
+  if (recurSubmitBtnEl) recurSubmitBtnEl.disabled = true;
 
-  // Compute start and end month
-  const now = new Date();
-  const startMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  let endMonth = null;
-  if (totalMonths > 0) {
-    const endDate = new Date(now.getFullYear(), now.getMonth() + totalMonths - 1, 1);
-    endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}`;
-  }
+  try {
+    // Resolve duration
+    let totalMonths = 0;
+    if (selectedDuration === 'custom') {
+      totalMonths = parseInt(document.getElementById('recurDurationCustom').value) || 0;
+      if (totalMonths < 1) { showToast('⚠️ Informe a quantidade de meses'); vibrate(100); return; }
+    } else {
+      totalMonths = selectedDuration; // 0 = indeterminate
+    }
 
-  const cat = getAllCategories().find(c => c.id === selectedRecurCategory);
-  if (!cat) { showToast('⚠️ Selecione uma categoria'); return; }
-  const recurData = {
-    person: selectedRecurPerson, description: desc, amount,
-    category: selectedRecurCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
-    day, totalMonths, startMonth, endMonth,
-    varAmount: recurVarActive
-  };
+    // Compute start and end month
+    const now = new Date();
+    const startMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    let endMonth = null;
+    if (totalMonths > 0) {
+      const endDate = new Date(now.getFullYear(), now.getMonth() + totalMonths - 1, 1);
+      endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}`;
+    }
 
-  const recurId = editingRecurId || Date.now().toString(36);
-
-  if (editingRecurId) {
-    // Ao editar: remover lançamentos antigos gerados por este recorrente
-    const oldExpenses = expenses.filter(e => e.recurringId === editingRecurId);
-    oldExpenses.forEach(e => {
-      expenses = expenses.filter(x => x.id !== e.id);
-      syncDelete(e.id);
-    });
-    const idx = recurringExpenses.findIndex(r => r.id === editingRecurId);
-    if (idx !== -1) recurringExpenses[idx] = { ...recurringExpenses[idx], ...recurData, id: recurId };
-  } else {
-    recurringExpenses.push({ id: recurId, launchedCount: 0, ...recurData });
-  }
-
-  // ── Criar lançamentos para todos os meses selecionados ──
-  const monthsToLaunch = totalMonths > 0 ? totalMonths : 24; // indefinido = 24 meses à frente
-  const now2 = new Date();
-
-  for (let m = 0; m < monthsToLaunch; m++) {
-    const targetDate = new Date(now2.getFullYear(), now2.getMonth() + m, 1);
-    const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}`;
-
-    // Respeitar endMonth
-    if (endMonth && targetMonth > endMonth) break;
-
-    // Calcular dia correto (evitar dias inválidos no mês)
-    const daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth()+1, 0).getDate();
-    const actualDay = Math.min(day, daysInMonth);
-    const expDate = `${targetMonth}-${String(actualDay).padStart(2,'0')}`;
-
-    const expId = 'recur_' + recurId + '_' + targetMonth;
-
-    // Não duplicar se já existe
-    if (expenses.some(e => e.id === expId)) continue;
-
-    const isCurrentMonth = m === 0;
-    const isPending = recurVarActive && !isCurrentMonth;
-
-    const newExp = {
-      id: expId,
-      recurringId: recurId,
-      person: selectedRecurPerson,
-      description: desc,
-      amount: isPending ? 0 : amount,
-      category: selectedRecurCategory,
-      categoryLabel: cat.label,
-      categoryIcon: cat.icon,
-      date: expDate,
-      isRecurring: true,
-      isPendingValue: isPending,
-      createdAt: new Date().toISOString(),
-      synced: false
+    const cat = getAllCategories().find(c => c.id === selectedRecurCategory);
+    if (!cat) { showToast('⚠️ Selecione uma categoria'); return; }
+    const recurData = {
+      person: selectedRecurPerson, description: desc, amount,
+      category: selectedRecurCategory, categoryLabel: cat.label, categoryIcon: cat.icon,
+      day, totalMonths, startMonth, endMonth,
+      varAmount: recurVarActive
     };
 
-    expenses.push(newExp);
-    if (!isPending) syncExpense(newExp, 'addExpense');
-  }
+    const recurId = editingRecurId || (Date.now().toString(36) + Math.random().toString(36).slice(2,6));
 
-  expenses.sort((a,b) => (b.date||'').localeCompare(a.date||''));
-  saveToStorage();
-  saveRecurring();
-  closeRecurModal();
-  renderRecurList();
-  updateHeader();
-  renderExpenses();
-  vibrate(40);
-  const durLabel = totalMonths === 0 ? 'nos próximos 24 meses' : `por ${totalMonths} mês(es)`;
-  showToast(`🔄 Gasto fixo salvo — lançado ${durLabel}!`);
+    if (editingRecurId) {
+      // Ao editar: remover lançamentos antigos gerados por este recorrente
+      const oldExpenses = expenses.filter(e => e.recurringId === editingRecurId);
+      oldExpenses.forEach(e => {
+        expenses = expenses.filter(x => x.id !== e.id);
+        syncDelete(e.id);
+      });
+      const idx = recurringExpenses.findIndex(r => r.id === editingRecurId);
+      if (idx !== -1) recurringExpenses[idx] = { ...recurringExpenses[idx], ...recurData, id: recurId };
+    } else {
+      recurringExpenses.push({ id: recurId, launchedCount: 0, ...recurData });
+    }
+
+    // ── Criar lançamentos para todos os meses selecionados ──
+    const monthsToLaunch = totalMonths > 0 ? totalMonths : 24; // indefinido = 24 meses à frente
+    const now2 = new Date();
+
+    for (let m = 0; m < monthsToLaunch; m++) {
+      const targetDate = new Date(now2.getFullYear(), now2.getMonth() + m, 1);
+      const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}`;
+
+      // Respeitar endMonth
+      if (endMonth && targetMonth > endMonth) break;
+
+      // Calcular dia correto (evitar dias inválidos no mês)
+      const daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth()+1, 0).getDate();
+      const actualDay = Math.min(day, daysInMonth);
+      const expDate = `${targetMonth}-${String(actualDay).padStart(2,'0')}`;
+
+      const expId = 'recur_' + recurId + '_' + targetMonth;
+
+      // Não duplicar se já existe
+      if (expenses.some(e => e.id === expId)) continue;
+
+      const isCurrentMonth = m === 0;
+      const isPending = recurVarActive && !isCurrentMonth;
+
+      const newExp = {
+        id: expId,
+        recurringId: recurId,
+        person: selectedRecurPerson,
+        description: desc,
+        amount: isPending ? 0 : amount,
+        category: selectedRecurCategory,
+        categoryLabel: cat.label,
+        categoryIcon: cat.icon,
+        date: expDate,
+        isRecurring: true,
+        isPendingValue: isPending,
+        createdAt: new Date().toISOString(),
+        synced: false
+      };
+
+      expenses.push(newExp);
+      if (!isPending) syncExpense(newExp, 'addExpense');
+    }
+
+    expenses.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    saveToStorage();
+    saveRecurring();
+    closeRecurModal();
+    renderRecurList();
+    updateHeader();
+    renderExpenses();
+    vibrate(40);
+    const durLabel = totalMonths === 0 ? 'nos próximos 24 meses' : `por ${totalMonths} mês(es)`;
+    showToast(`🔄 Gasto fixo salvo — lançado ${durLabel}!`);
+  } finally {
+    window._submittingRecur = false;
+    if (recurSubmitBtnEl) recurSubmitBtnEl.disabled = false;
+  }
 }
 
 function deleteRecur(id) {
@@ -5713,13 +5731,15 @@ function updateTrashCount() {
 }
 
 // ── Detectar possíveis duplicados ──
-// Agrupa lançamentos com a mesma pessoa + categoria + valor + data.
-// Parcelas e gastos fixos ficam de fora porque têm repetição legítima
-// (mesma descrição em meses diferentes, ou parcelas do mesmo dia 01).
+// Agrupa lançamentos com a mesma pessoa + categoria + valor + data. Parcelas
+// ficam de fora (têm sua própria lógica de agrupamento por dia 01), mas
+// gastos fixos ENTRAM na busca — duas regras de recorrência diferentes que
+// coincidem no mesmo mês são exatamente o tipo de duplicata que precisa
+// aparecer aqui.
 function findDuplicateExpenses() {
   const groups = {};
   expenses.forEach(e => {
-    if (e.isInstallment || e.isRecurring || e.isPendingValue) return;
+    if (e.isInstallment) return;
     const key = [e.person, e.category || e.categoryLabel, e.amount, e.date].join('|');
     if (!groups[key]) groups[key] = [];
     groups[key].push(e);
@@ -5727,22 +5747,82 @@ function findDuplicateExpenses() {
   return Object.values(groups).filter(g => g.length > 1);
 }
 
+// Detecta REGRAS de gasto fixo duplicadas (mesma pessoa+categoria+valor+dia).
+// Isso é a causa raiz: apagar só o lançamento do mês não resolve — a regra
+// duplicada volta a gerar o mesmo gasto todo mês seguinte.
+function findDuplicateRecurringRules() {
+  const groups = {};
+  recurringExpenses.forEach(r => {
+    const key = [r.person, r.category || r.categoryLabel, r.amount, r.day].join('|');
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  });
+  return Object.values(groups).filter(g => g.length > 1);
+}
+
+// Remove uma regra de gasto fixo duplicada E todos os lançamentos (passados
+// e futuros) que ela já gerou — diferente do "Remover" normal da tela de
+// Gastos Fixos, que só para a recorrência sem apagar o histórico já gerado
+// (correto para cancelamentos reais, mas não para uma regra que nunca
+// deveria ter existido).
+function deleteDuplicateRecurRule(id) {
+  if (!confirm('Remover esta regra duplicada e TODOS os lançamentos (passados e futuros) que ela gerou?')) return;
+  recurringExpenses = recurringExpenses.filter(r => r.id !== id);
+  saveRecurring();
+  syncRecurring();
+
+  const toDelete = expenses.filter(e => e.recurringId === id);
+  toDelete.forEach(e => { addToTrash(e); syncDelete(e.id); });
+  expenses = expenses.filter(e => e.recurringId !== id);
+  saveToStorage();
+
+  updateHeader();
+  renderExpenses();
+  renderRecurList();
+  vibrate([50, 30, 50]);
+  showToast('🗑️ Regra duplicada e seus lançamentos removidos');
+  openDuplicatesModal();
+}
+
 function openDuplicatesModal() {
   const body = document.getElementById('duplicatesBody');
   if (!body) return;
-  const groups = findDuplicateExpenses();
+  const ruleGroups = findDuplicateRecurringRules();
+  const expGroups = findDuplicateExpenses();
 
-  if (!groups.length) {
-    body.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Nenhum duplicado encontrado</div><div class="empty-desc">Não achei lançamentos com a mesma pessoa, categoria, valor e data.</div></div>';
+  let html = '';
+
+  if (ruleGroups.length) {
+    html += '<div class="card-title" style="font-size:13px;margin-bottom:8px">🔁 Regras de gasto fixo duplicadas</div>'
+      + '<p style="font-size:11px;color:var(--text-hint);margin-top:-4px;margin-bottom:10px">Essa é a causa mais comum: duas regras iguais, cada uma gerando o gasto todo mês. Remover aqui apaga a regra E os lançamentos que ela já criou.</p>'
+      + ruleGroups.map(g => {
+        const r0 = g[0];
+        return '<div style="margin-bottom:16px;padding:10px;background:var(--red-50);border:1px solid var(--red-200);border-radius:12px">'
+          + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">' + (r0.categoryIcon||'📋') + ' ' + r0.categoryLabel + ' · ' + fmtCurrency(r0.amount) + ' · dia ' + r0.day + '</div>'
+          + g.map(r => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px">${r.description}</div>
+                <div style="font-size:11px;color:var(--text-hint)">${r.person} · criada em ${r.startMonth || '?'}</div>
+              </div>
+              <button class="btn-secondary" style="padding:6px 10px;font-size:12px;margin:0;color:var(--red-700)" onclick="deleteDuplicateRecurRule('${r.id}')">🗑️ Remover regra</button>
+            </div>`).join('')
+          + '</div>';
+      }).join('');
+  }
+
+  html += '<div class="card-title" style="font-size:13px;margin-bottom:8px' + (ruleGroups.length ? ';margin-top:18px' : '') + '">📋 Lançamentos duplicados</div>';
+
+  if (!expGroups.length) {
+    html += '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Nenhum lançamento duplicado</div><div class="empty-desc">Não achei lançamentos com a mesma pessoa, categoria, valor e data.</div></div>';
   } else {
-    body.innerHTML = groups.map(g => {
+    html += expGroups.map(g => {
       const e0 = g[0];
       const dateLabel = e0.date.split('-').reverse().join('/');
       return '<div style="margin-bottom:16px;padding:10px;background:var(--amber-50);border:1px solid var(--amber-200);border-radius:12px">'
         + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">' + (e0.categoryIcon||'📋') + ' ' + e0.categoryLabel + ' · ' + fmtCurrency(e0.amount) + ' · ' + dateLabel + '</div>'
         + g.map(e => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border)">
             <div style="flex:1;min-width:0">
-              <div style="font-size:13px">${e.description}</div>
+              <div style="font-size:13px">${e.description}${e.isRecurring ? ' <span style="color:var(--text-hint);font-size:11px">(fixo)</span>' : ''}</div>
               <div style="font-size:11px;color:var(--text-hint)">${e.person}</div>
             </div>
             <button class="btn-secondary" style="padding:6px 10px;font-size:12px;margin:0;color:var(--red-700)" onclick="openDelModal('${e.id}')">🗑️ Excluir</button>
@@ -5750,6 +5830,8 @@ function openDuplicatesModal() {
         + '</div>';
     }).join('');
   }
+
+  body.innerHTML = html;
   document.getElementById('duplicatesModal').classList.add('open');
 }
 
@@ -5963,6 +6045,9 @@ var mkVarActive = true;
 function openMakeRecurModal(expId) {
   var e = expenses.find(function(x) { return x.id === expId; });
   if (!e) return;
+  window._submittingRecur = false;
+  var mkBtnReset = document.getElementById('mkRecurConfirmBtn');
+  if (mkBtnReset) mkBtnReset.disabled = false;
   makeRecurExpId = expId;
   mkDuration = 0;
   mkVarActive = true;
@@ -5994,60 +6079,75 @@ function toggleMkVar() {
 }
 function confirmMakeRecur() {
   if (!makeRecurExpId) return;
-  var e = expenses.find(function(x) { return x.id === makeRecurExpId; });
-  if (!e) return;
-  var recurId = 'recur_' + Date.now().toString(36);
-  var expDate = e.date || '';
-  var parts = expDate.split('-').map(Number);
-  var day = parts[2] || 1;
-  var allCats = getAllCategories();
-  var cat = allCats.find(function(c) { return c.id === e.category; }) || { label: e.categoryLabel, icon: e.categoryIcon };
-  var now = new Date();
-  var monthsToLaunch = mkDuration > 0 ? mkDuration : 24;
-  for (var m = 1; m < monthsToLaunch; m++) {
-    var targetDate = new Date(now.getFullYear(), now.getMonth() + m, 1);
-    var targetMonth = targetDate.getFullYear() + '-' + String(targetDate.getMonth()+1).padStart(2,'0');
-    var daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth()+1, 0).getDate();
-    var actualDay = Math.min(day, daysInMonth);
-    var expDateFuture = targetMonth + '-' + String(actualDay).padStart(2,'0');
-    var expId = 'recur_' + recurId + '_' + targetMonth;
-    if (expenses.some(function(x) { return x.id === expId; })) continue;
-    var newExp = {
-      id: expId, recurringId: recurId, person: e.person,
-      description: e.description, amount: mkVarActive ? 0 : e.amount,
-      category: e.category, categoryLabel: cat.label, categoryIcon: cat.icon,
-      date: expDateFuture, isRecurring: true, isPendingValue: mkVarActive,
-      createdAt: new Date().toISOString(), synced: false
+
+  // Mesma trava do lançamento normal: sem isso, um segundo toque cria uma
+  // SEGUNDA regra de recorrência (recurId diferente), e cada uma passa a
+  // gerar seu próprio gasto todo mês — a fatura duplicada que não some
+  // sozinha, porque são duas regras genuinamente distintas no Firebase.
+  if (window._submittingRecur) return;
+  window._submittingRecur = true;
+  var mkBtn = document.getElementById('mkRecurConfirmBtn');
+  if (mkBtn) mkBtn.disabled = true;
+
+  try {
+    var e = expenses.find(function(x) { return x.id === makeRecurExpId; });
+    if (!e) return;
+    var recurId = 'recur_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    var expDate = e.date || '';
+    var parts = expDate.split('-').map(Number);
+    var day = parts[2] || 1;
+    var allCats = getAllCategories();
+    var cat = allCats.find(function(c) { return c.id === e.category; }) || { label: e.categoryLabel, icon: e.categoryIcon };
+    var now = new Date();
+    var monthsToLaunch = mkDuration > 0 ? mkDuration : 24;
+    for (var m = 1; m < monthsToLaunch; m++) {
+      var targetDate = new Date(now.getFullYear(), now.getMonth() + m, 1);
+      var targetMonth = targetDate.getFullYear() + '-' + String(targetDate.getMonth()+1).padStart(2,'0');
+      var daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth()+1, 0).getDate();
+      var actualDay = Math.min(day, daysInMonth);
+      var expDateFuture = targetMonth + '-' + String(actualDay).padStart(2,'0');
+      var expId = 'recur_' + recurId + '_' + targetMonth;
+      if (expenses.some(function(x) { return x.id === expId; })) continue;
+      var newExp = {
+        id: expId, recurringId: recurId, person: e.person,
+        description: e.description, amount: mkVarActive ? 0 : e.amount,
+        category: e.category, categoryLabel: cat.label, categoryIcon: cat.icon,
+        date: expDateFuture, isRecurring: true, isPendingValue: mkVarActive,
+        createdAt: new Date().toISOString(), synced: false
+      };
+      expenses.push(newExp);
+      // Sync ALL to Firebase — pending ones with amount:0 so the other device knows they exist
+      syncExpense(newExp);
+    }
+    var newRecur = {
+      id: recurId, person: e.person, description: e.description,
+      amount: e.amount, category: e.category, categoryLabel: cat.label, categoryIcon: cat.icon,
+      day: day, startMonth: expDate.slice(0,7), totalMonths: mkDuration,
+      varValue: mkVarActive, launchedCount: 1
     };
-    expenses.push(newExp);
-    // Sync ALL to Firebase — pending ones with amount:0 so the other device knows they exist
-    syncExpense(newExp);
+    recurringExpenses.push(newRecur);
+    // Sync the original expense as updated (now has isRecurring flag)
+    e.isRecurring = true;
+    e.recurringId = recurId;
+    syncExpense(e);
+    expenses.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+    saveToStorage();
+    // Sync all new future expenses to Firebase
+    expenses.forEach(function(exp) {
+      if (exp.recurringId === recurId) syncExpense(exp);
+    });
+    saveRecurring();
+    syncRecurring();
+    closeMakeRecurModal();
+    updateHeader();
+    renderExpenses();
+    renderRecurList();
+    showToast('Gasto fixo criado e sincronizado!');
+    vibrate(40);
+  } finally {
+    window._submittingRecur = false;
+    if (mkBtn) mkBtn.disabled = false;
   }
-  var newRecur = {
-    id: recurId, person: e.person, description: e.description,
-    amount: e.amount, category: e.category, categoryLabel: cat.label, categoryIcon: cat.icon,
-    day: day, startMonth: expDate.slice(0,7), totalMonths: mkDuration,
-    varValue: mkVarActive, launchedCount: 1
-  };
-  recurringExpenses.push(newRecur);
-  // Sync the original expense as updated (now has isRecurring flag)
-  e.isRecurring = true;
-  e.recurringId = recurId;
-  syncExpense(e);
-  expenses.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
-  saveToStorage();
-  // Sync all new future expenses to Firebase
-  expenses.forEach(function(exp) {
-    if (exp.recurringId === recurId) syncExpense(exp);
-  });
-  saveRecurring();
-  syncRecurring();
-  closeMakeRecurModal();
-  updateHeader();
-  renderExpenses();
-  renderRecurList();
-  showToast('Gasto fixo criado e sincronizado!');
-  vibrate(40);
 }
 
 // ════ AUTO-FIX: corrigir categoryLabel undefined nos gastos fixos ════
